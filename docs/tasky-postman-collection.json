@@ -1,0 +1,603 @@
+{
+  "info": {
+    "name": "Tasky.io API",
+    "description": "Complete API collection for Tasky.io microservices — Auth, User, Project, Task, Tracker, Inbox",
+    "_postman_id": "tasky-io-v1",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_url", "value": "http://localhost:3080", "type": "string" },
+    { "key": "token",    "value": "",                      "type": "string" },
+    { "key": "projectId","value": "",                      "type": "string" },
+    { "key": "taskId",   "value": "",                      "type": "string" },
+    { "key": "entryId",  "value": "",                      "type": "string" },
+    { "key": "notifId",  "value": "",                      "type": "string" }
+  ],
+  "item": [
+
+    {
+      "name": "🏥 Health Checks",
+      "item": [
+        {
+          "name": "Auth Service Health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{base_url}}/health/auth", "host": ["{{base_url}}"], "path": ["health","auth"] }
+          }
+        },
+        {
+          "name": "User Service Health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{base_url}}/health/users", "host": ["{{base_url}}"], "path": ["health","users"] }
+          }
+        },
+        {
+          "name": "Project Service Health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{base_url}}/health/projects", "host": ["{{base_url}}"], "path": ["health","projects"] }
+          }
+        },
+        {
+          "name": "Task Service Health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{base_url}}/health/tasks", "host": ["{{base_url}}"], "path": ["health","tasks"] }
+          }
+        },
+        {
+          "name": "Tracker Service Health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{base_url}}/health/tracker", "host": ["{{base_url}}"], "path": ["health","tracker"] }
+          }
+        },
+        {
+          "name": "Inbox Service Health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{base_url}}/health/inbox", "host": ["{{base_url}}"], "path": ["health","inbox"] }
+          }
+        },
+        {
+          "name": "Auth Service Health (direct)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "http://localhost:3000/health", "raw": "http://localhost:3000/health" }
+          }
+        },
+        {
+          "name": "User Service Health (direct)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "http://localhost:3001/health" }
+          }
+        },
+        {
+          "name": "Project Service Health (direct)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "http://localhost:3002/health" }
+          }
+        },
+        {
+          "name": "Task Service Health (direct)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "http://localhost:3003/health" }
+          }
+        },
+        {
+          "name": "Tracker Service Health (direct)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "http://localhost:3004/health" }
+          }
+        },
+        {
+          "name": "Inbox Service Health (direct)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "http://localhost:3005/health" }
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "🔐 Auth Service",
+      "item": [
+        {
+          "name": "Register",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.token) {",
+                  "  pm.collectionVariables.set('token', res.token);",
+                  "  console.log('Token saved:', res.token.substring(0,40) + '...');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"demo@tasky.io\",\n  \"password\": \"Demo1234x\",\n  \"name\": \"Demo User\"\n}"
+            },
+            "url": { "raw": "{{base_url}}/api/auth/register", "host": ["{{base_url}}"], "path": ["api","auth","register"] }
+          }
+        },
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.token) {",
+                  "  pm.collectionVariables.set('token', res.token);",
+                  "  console.log('Token saved');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"demo@tasky.io\",\n  \"password\": \"Demo1234x\"\n}"
+            },
+            "url": { "raw": "{{base_url}}/api/auth/login", "host": ["{{base_url}}"], "path": ["api","auth","login"] }
+          }
+        },
+        {
+          "name": "Verify Token",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{base_url}}/api/auth/verify", "host": ["{{base_url}}"], "path": ["api","auth","verify"] }
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "👤 User Service",
+      "item": [
+        {
+          "name": "Get My Profile",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{base_url}}/api/users/me", "host": ["{{base_url}}"], "path": ["api","users","me"] }
+          }
+        },
+        {
+          "name": "Update My Profile",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Updated Name\",\n  \"timezone\": \"Asia/Colombo\"\n}"
+            },
+            "url": { "raw": "{{base_url}}/api/users/me", "host": ["{{base_url}}"], "path": ["api","users","me"] }
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "📁 Project Service",
+      "item": [
+        {
+          "name": "Create Project",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res._id) pm.collectionVariables.set('projectId', res._id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"My First Project\",\n  \"description\": \"Demo project for Tasky.io\"\n}"
+            },
+            "url": { "raw": "{{base_url}}/api/projects", "host": ["{{base_url}}"], "path": ["api","projects"] }
+          }
+        },
+        {
+          "name": "List My Projects",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{base_url}}/api/projects", "host": ["{{base_url}}"], "path": ["api","projects"] }
+          }
+        },
+        {
+          "name": "Get Project by ID",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{base_url}}/api/projects/{{projectId}}", "host": ["{{base_url}}"], "path": ["api","projects","{{projectId}}"] }
+          }
+        },
+        {
+          "name": "Update Project",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Updated Project Name\",\n  \"status\": \"active\"\n}"
+            },
+            "url": { "raw": "{{base_url}}/api/projects/{{projectId}}", "host": ["{{base_url}}"], "path": ["api","projects","{{projectId}}"] }
+          }
+        },
+        {
+          "name": "Get Project Stats",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{base_url}}/api/projects/{{projectId}}/stats", "host": ["{{base_url}}"], "path": ["api","projects","{{projectId}}","stats"] }
+          }
+        },
+        {
+          "name": "Add Member to Project",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"<member-user-id>\"\n}"
+            },
+            "url": { "raw": "{{base_url}}/api/projects/{{projectId}}/members", "host": ["{{base_url}}"], "path": ["api","projects","{{projectId}}","members"] }
+          }
+        },
+        {
+          "name": "Remove Member from Project",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{base_url}}/api/projects/{{projectId}}/members/<userId>", "host": ["{{base_url}}"], "path": ["api","projects","{{projectId}}","members","<userId>"] }
+          }
+        },
+        {
+          "name": "Delete Project",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{base_url}}/api/projects/{{projectId}}", "host": ["{{base_url}}"], "path": ["api","projects","{{projectId}}"] }
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "✅ Task Service",
+      "item": [
+        {
+          "name": "Create Task",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res._id) pm.collectionVariables.set('taskId', res._id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Implement login page\",\n  \"description\": \"Build the React login form\",\n  \"projectId\": \"{{projectId}}\",\n  \"priority\": \"high\",\n  \"dueDate\": \"2026-04-01\"\n}"
+            },
+            "url": { "raw": "{{base_url}}/api/tasks", "host": ["{{base_url}}"], "path": ["api","tasks"] }
+          }
+        },
+        {
+          "name": "List Tasks",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/tasks?projectId={{projectId}}",
+              "host": ["{{base_url}}"],
+              "path": ["api","tasks"],
+              "query": [{ "key": "projectId", "value": "{{projectId}}" }]
+            }
+          }
+        },
+        {
+          "name": "Get Task by ID",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{base_url}}/api/tasks/{{taskId}}", "host": ["{{base_url}}"], "path": ["api","tasks","{{taskId}}"] }
+          }
+        },
+        {
+          "name": "Update Task",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"in-progress\",\n  \"priority\": \"urgent\"\n}"
+            },
+            "url": { "raw": "{{base_url}}/api/tasks/{{taskId}}", "host": ["{{base_url}}"], "path": ["api","tasks","{{taskId}}"] }
+          }
+        },
+        {
+          "name": "Assign Task",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"assigneeId\": \"<user-id>\"\n}"
+            },
+            "url": { "raw": "{{base_url}}/api/tasks/{{taskId}}/assign", "host": ["{{base_url}}"], "path": ["api","tasks","{{taskId}}","assign"] }
+          }
+        },
+        {
+          "name": "Complete Task",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{base_url}}/api/tasks/{{taskId}}/complete", "host": ["{{base_url}}"], "path": ["api","tasks","{{taskId}}","complete"] }
+          }
+        },
+        {
+          "name": "Tasks by Project",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{base_url}}/api/tasks/project/{{projectId}}", "host": ["{{base_url}}"], "path": ["api","tasks","project","{{projectId}}"] }
+          }
+        },
+        {
+          "name": "Delete Task",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{base_url}}/api/tasks/{{taskId}}", "host": ["{{base_url}}"], "path": ["api","tasks","{{taskId}}"] }
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "⏱ Tracker Service",
+      "item": [
+        {
+          "name": "Log Time Entry",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res._id) pm.collectionVariables.set('entryId', res._id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"taskId\": \"{{taskId}}\",\n  \"projectId\": \"{{projectId}}\",\n  \"description\": \"Working on login page\",\n  \"startedAt\": \"2026-03-16T09:00:00.000Z\",\n  \"endedAt\": \"2026-03-16T10:30:00.000Z\"\n}"
+            },
+            "url": { "raw": "{{base_url}}/api/tracker/entries", "host": ["{{base_url}}"], "path": ["api","tracker","entries"] }
+          }
+        },
+        {
+          "name": "List Time Entries",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/tracker/entries?taskId={{taskId}}",
+              "host": ["{{base_url}}"],
+              "path": ["api","tracker","entries"],
+              "query": [{ "key": "taskId", "value": "{{taskId}}" }]
+            }
+          }
+        },
+        {
+          "name": "Update Time Entry",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"description\": \"Finalised login page implementation\",\n  \"endedAt\": \"2026-03-16T11:00:00.000Z\"\n}"
+            },
+            "url": { "raw": "{{base_url}}/api/tracker/entries/{{entryId}}", "host": ["{{base_url}}"], "path": ["api","tracker","entries","{{entryId}}"] }
+          }
+        },
+        {
+          "name": "Delete Time Entry",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{base_url}}/api/tracker/entries/{{entryId}}", "host": ["{{base_url}}"], "path": ["api","tracker","entries","{{entryId}}"] }
+          }
+        },
+        {
+          "name": "Tracker Dashboard",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{base_url}}/api/tracker/dashboard", "host": ["{{base_url}}"], "path": ["api","tracker","dashboard"] }
+          }
+        },
+        {
+          "name": "Project Report",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{base_url}}/api/tracker/reports/project/{{projectId}}", "host": ["{{base_url}}"], "path": ["api","tracker","reports","project","{{projectId}}"] }
+          }
+        },
+        {
+          "name": "Milestones",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{base_url}}/api/tracker/milestones/{{projectId}}", "host": ["{{base_url}}"], "path": ["api","tracker","milestones","{{projectId}}"] }
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "📬 Inbox Service",
+      "item": [
+        {
+          "name": "Get Notifications",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{base_url}}/api/inbox/notifications", "host": ["{{base_url}}"], "path": ["api","inbox","notifications"] }
+          }
+        },
+        {
+          "name": "Unread Count",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{base_url}}/api/inbox/unread-count", "host": ["{{base_url}}"], "path": ["api","inbox","unread-count"] }
+          }
+        },
+        {
+          "name": "Mark Notification Read",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res._id) pm.collectionVariables.set('notifId', res._id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{base_url}}/api/inbox/notifications/{{notifId}}/read", "host": ["{{base_url}}"], "path": ["api","inbox","notifications","{{notifId}}","read"] }
+          }
+        },
+        {
+          "name": "Mark All Read",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{base_url}}/api/inbox/notifications/read-all", "host": ["{{base_url}}"], "path": ["api","inbox","notifications","read-all"] }
+          }
+        },
+        {
+          "name": "Dismiss Notification",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{base_url}}/api/inbox/notifications/{{notifId}}", "host": ["{{base_url}}"], "path": ["api","inbox","notifications","{{notifId}}"] }
+          }
+        },
+        {
+          "name": "Get Messages",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{base_url}}/api/inbox/messages", "host": ["{{base_url}}"], "path": ["api","inbox","messages"] }
+          }
+        },
+        {
+          "name": "Send Message",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"recipientId\": \"<recipient-user-id>\",\n  \"content\": \"Hey, can you review my PR?\"\n}"
+            },
+            "url": { "raw": "{{base_url}}/api/inbox/messages", "host": ["{{base_url}}"], "path": ["api","inbox","messages"] }
+          }
+        }
+      ]
+    }
+
+  ]
+}

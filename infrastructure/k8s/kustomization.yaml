@@ -1,0 +1,26 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: tasky
+
+resources:
+  - namespace.yaml
+  - kafka/statefulset.yaml
+  - kafka/service.yaml
+  - nginx/configmap.yaml
+  - nginx/deployment.yaml
+  - nginx/service.yaml
+  - auth-service/deployment.yaml
+  - auth-service/service.yaml
+  - user-service/deployment.yaml
+  - user-service/service.yaml
+  - project-service/deployment.yaml
+  - project-service/service.yaml
+  - task-service/deployment.yaml
+  - task-service/service.yaml
+  - tracker-service/deployment.yaml
+  - tracker-service/service.yaml
+  - inbox-service/deployment.yaml
+  - inbox-service/service.yaml
+  - frontend/deployment.yaml
+  - frontend/service.yaml

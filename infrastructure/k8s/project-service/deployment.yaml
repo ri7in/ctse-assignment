@@ -1,0 +1,57 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: project-service
+  namespace: tasky
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: project-service
+  template:
+    metadata:
+      labels:
+        app: project-service
+    spec:
+      containers:
+        - name: project-service
+          image: ghcr.io/tasky-io/project-service:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 3002
+          env:
+            - name: PORT
+              value: '3002'
+            - name: NODE_ENV
+              value: 'production'
+            - name: AUTH_SERVICE_URL
+              value: 'http://auth-service:3000'
+            - name: KAFKA_BROKER
+              value: 'kafka-0.kafka.tasky.svc.cluster.local:9092'
+            - name: KAFKA_CLIENT_ID
+              value: 'project-service'
+            - name: KAFKA_GROUP_ID
+              value: 'tasky-project-group'
+            - name: MONGODB_URI
+              valueFrom:
+                secretKeyRef:
+                  name: tasky-secrets
+                  key: MONGODB_URI_PROJECTS
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: tasky-secrets
+                  key: JWT_SECRET
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 3002
+            initialDelaySeconds: 10
+            periodSeconds: 10
