@@ -1,0 +1,68 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-config
+  namespace: tasky
+data:
+  default.conf: |
+    upstream auth_service    { server auth-service:3000; }
+    upstream user_service    { server user-service:3001; }
+    upstream project_service { server project-service:3002; }
+    upstream task_service    { server task-service:3003; }
+    upstream tracker_service { server tracker-service:3004; }
+    upstream inbox_service   { server inbox-service:3005; }
+    upstream frontend        { server frontend:80; }
+
+    server {
+        listen 80;
+        server_name _;
+
+        location /api/auth/ {
+            proxy_pass         http://auth_service;
+            proxy_set_header   Host              $host;
+            proxy_set_header   X-Real-IP         $remote_addr;
+            proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
+        }
+
+        location /api/users/ {
+            proxy_pass         http://user_service;
+            proxy_set_header   Host              $host;
+            proxy_set_header   X-Real-IP         $remote_addr;
+            proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
+        }
+
+        location /api/projects/ {
+            proxy_pass         http://project_service;
+            proxy_set_header   Host              $host;
+            proxy_set_header   X-Real-IP         $remote_addr;
+            proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
+        }
+
+        location /api/tasks/ {
+            proxy_pass         http://task_service;
+            proxy_set_header   Host              $host;
+            proxy_set_header   X-Real-IP         $remote_addr;
+            proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
+        }
+
+        location /api/tracker/ {
+            proxy_pass         http://tracker_service;
+            proxy_set_header   Host              $host;
+            proxy_set_header   X-Real-IP         $remote_addr;
+            proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
+        }
+
+        location /api/inbox/ {
+            proxy_pass         http://inbox_service;
+            proxy_set_header   Host              $host;
+            proxy_set_header   X-Real-IP         $remote_addr;
+            proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
+        }
+
+        location / {
+            proxy_pass         http://frontend;
+            proxy_set_header   Host              $host;
+            proxy_set_header   X-Real-IP         $remote_addr;
+            proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
+        }
+    }
