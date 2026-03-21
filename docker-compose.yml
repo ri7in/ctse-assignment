@@ -1,0 +1,242 @@
+services:
+  # ─────────────────────────────────────────────
+  # Apache Kafka (KRaft mode — no ZooKeeper)
+  # ─────────────────────────────────────────────
+  kafka:
+    image: apache/kafka:3.7.0
+    container_name: tasky-kafka
+    ports:
+      - '9092:9092'
+    environment:
+      # KRaft settings
+      KAFKA_NODE_ID: '1'
+      KAFKA_PROCESS_ROLES: 'broker,controller'
+      KAFKA_CONTROLLER_QUORUM_VOTERS: '1@kafka:9093'
+      KAFKA_CONTROLLER_LISTENER_NAMES: 'CONTROLLER'
+      # Listeners
+      KAFKA_LISTENERS: 'PLAINTEXT://:9092,CONTROLLER://:9093'
+      KAFKA_ADVERTISED_LISTENERS: 'PLAINTEXT://kafka:9092'
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: 'PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT'
+      KAFKA_INTER_BROKER_LISTENER_NAME: 'PLAINTEXT'
+      # Topic defaults
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
+      KAFKA_NUM_PARTITIONS: '3'
+      KAFKA_DEFAULT_REPLICATION_FACTOR: '1'
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: '1'
+      KAFKA_LOG_DIRS: '/var/lib/kafka/data'
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+    healthcheck:
+      test: ['CMD', '/opt/kafka/bin/kafka-topics.sh', '--list', '--bootstrap-server', 'localhost:9092']
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+    networks:
+      - tasky-net
+
+  # ─────────────────────────────────────────────
+  # MongoDB (shared local instance)
+  # ─────────────────────────────────────────────
+  mongodb:
+    image: mongo:7
+    container_name: tasky-mongodb
+    ports:
+      - '27017:27017'
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: ['CMD', 'mongosh', '--eval', 'db.adminCommand("ping")']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - tasky-net
+
+  # ─────────────────────────────────────────────
+  # Auth Service (port 3000)
+  # ─────────────────────────────────────────────
+  auth-service:
+    build: ./auth-service
+    container_name: tasky-auth
+    env_file: ./auth-service/.env
+    environment:
+      PORT: '3000'
+      MONGODB_URI: 'mongodb://mongodb:27017/tasktracker-auth'
+      NODE_ENV: 'development'
+    ports:
+      - '3000:3000'
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - tasky-net
+    restart: on-failure
+
+  # ─────────────────────────────────────────────
+  # User Service (port 3001)
+  # ─────────────────────────────────────────────
+  user-service:
+    build: ./user-service
+    container_name: tasky-user
+    env_file: ./user-service/.env
+    environment:
+      PORT: '3001'
+      MONGODB_URI: 'mongodb://mongodb:27017/tasktracker-users'
+      AUTH_SERVICE_URL: 'http://auth-service:3000'
+      NODE_ENV: 'development'
+      KAFKA_BROKER: 'kafka:9092'
+      KAFKA_CLIENT_ID: 'user-service'
+    ports:
+      - '3001:3001'
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    networks:
+      - tasky-net
+    restart: on-failure
+
+  # ─────────────────────────────────────────────
+  # Project Service (port 3002) — Jayasuriya
+  # ─────────────────────────────────────────────
+  project-service:
+    build: ./project-service
+    container_name: tasky-project
+    env_file: ./project-service/.env
+    environment:
+      PORT: '3002'
+      MONGODB_URI: 'mongodb://mongodb:27017/tasktracker-projects'
+      AUTH_SERVICE_URL: 'http://auth-service:3000'
+      NODE_ENV: 'development'
+      KAFKA_BROKER: 'kafka:9092'
+      KAFKA_CLIENT_ID: 'project-service'
+      KAFKA_GROUP_ID: 'tasky-project-group'
+    ports:
+      - '3002:3002'
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    networks:
+      - tasky-net
+    restart: on-failure
+
+  # ─────────────────────────────────────────────
+  # Task Service (port 3003) — Piyarisi
+  # ─────────────────────────────────────────────
+  task-service:
+    build: ./task-service
+    container_name: tasky-task
+    env_file: ./task-service/.env
+    environment:
+      PORT: '3003'
+      MONGODB_URI: 'mongodb://mongodb:27017/tasktracker-tasks'
+      AUTH_SERVICE_URL: 'http://auth-service:3000'
+      NODE_ENV: 'development'
+      KAFKA_BROKER: 'kafka:9092'
+      KAFKA_CLIENT_ID: 'task-service'
+      KAFKA_GROUP_ID: 'tasky-task-group'
+    ports:
+      - '3003:3003'
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    networks:
+      - tasky-net
+    restart: on-failure
+
+  # ─────────────────────────────────────────────
+  # Tracker Service (port 3004) — Manamperi
+  # ─────────────────────────────────────────────
+  tracker-service:
+    build: ./tracker-service
+    container_name: tasky-tracker
+    env_file: ./tracker-service/.env
+    environment:
+      PORT: '3004'
+      MONGODB_URI: 'mongodb://mongodb:27017/tasktracker-tracker'
+      AUTH_SERVICE_URL: 'http://auth-service:3000'
+      NODE_ENV: 'development'
+      KAFKA_BROKER: 'kafka:9092'
+      KAFKA_CLIENT_ID: 'tracker-service'
+      KAFKA_GROUP_ID: 'tasky-tracker-group'
+    ports:
+      - '3004:3004'
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    networks:
+      - tasky-net
+    restart: on-failure
+
+  # ─────────────────────────────────────────────
+  # Inbox Service (port 3005) — Wickramasooriya
+  # ─────────────────────────────────────────────
+  inbox-service:
+    build: ./inbox-service
+    container_name: tasky-inbox
+    env_file: ./inbox-service/.env
+    environment:
+      PORT: '3005'
+      MONGODB_URI: 'mongodb://mongodb:27017/tasktracker-inbox'
+      AUTH_SERVICE_URL: 'http://auth-service:3000'
+      NODE_ENV: 'development'
+      KAFKA_BROKER: 'kafka:9092'
+      KAFKA_CLIENT_ID: 'inbox-service'
+      KAFKA_GROUP_ID: 'tasky-inbox-group'
+    ports:
+      - '3005:3005'
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    networks:
+      - tasky-net
+    restart: on-failure
+
+  # ─────────────────────────────────────────────
+  # Frontend (React + Vite → served by nginx)
+  # ─────────────────────────────────────────────
+  frontend:
+    build: ./frontend
+    container_name: tasky-frontend
+    env_file: ./frontend/.env
+    networks:
+      - tasky-net
+
+  # ─────────────────────────────────────────────
+  # Nginx — single entry point on port 3080
+  # ─────────────────────────────────────────────
+  nginx:
+    build: ./nginx
+    container_name: tasky-nginx
+    ports:
+      - '3080:80'
+    depends_on:
+      - auth-service
+      - user-service
+      - project-service
+      - task-service
+      - tracker-service
+      - inbox-service
+      - frontend
+    networks:
+      - tasky-net
+    restart: on-failure
+
+volumes:
+  kafka_data:
+  mongo_data:
+
+networks:
+  tasky-net:
+    driver: bridge
