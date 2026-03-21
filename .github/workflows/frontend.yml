@@ -1,0 +1,78 @@
+name: Frontend CI/CD
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/frontend.yml'
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: tasky-io/frontend
+  ECS_SERVICE: tasky-frontend-svc
+  ECS_CLUSTER: tasky-cluster
+  CONTAINER_NAME: frontend
+
+jobs:
+  build-and-deploy:
+    name: Build & Deploy
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build, tag & push Docker image to GHCR
+        id: build-image
+        env:
+          IMAGE_TAG: ${{ github.sha }}
+          VITE_FIREBASE_CONFIG: ${{ secrets.VITE_FIREBASE_CONFIG }}
+          VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL }}
+        run: |
+          docker build \
+            --build-arg VITE_FIREBASE_CONFIG="$VITE_FIREBASE_CONFIG" \
+            --build-arg VITE_API_BASE_URL="$VITE_API_BASE_URL" \
+            -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:$IMAGE_TAG \
+            -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest \
+            ./frontend
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:$IMAGE_TAG
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          echo "image=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:$IMAGE_TAG" >> $GITHUB_OUTPUT
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Download current ECS task definition
+        run: |
+          aws ecs describe-task-definition \
+            --task-definition ${{ env.CONTAINER_NAME }} \
+            --query taskDefinition > task-definition.json
+
+      - name: Update ECS task definition with new image
+        id: task-def
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: task-definition.json
+          container-name: ${{ env.CONTAINER_NAME }}
+          image: ${{ steps.build-image.outputs.image }}
+
+      - name: Deploy to ECS
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v1
+        with:
+          task-definition: ${{ steps.task-def.outputs.task-definition }}
+          service: ${{ env.ECS_SERVICE }}
+          cluster: ${{ env.ECS_CLUSTER }}
+          wait-for-service-stability: true
