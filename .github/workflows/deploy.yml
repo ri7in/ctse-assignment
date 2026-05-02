@@ -1,8 +1,60 @@
-deploy:
+name: Deploy to EC2
+
+on:
+  push:
+    branches: [release-1]
+  workflow_dispatch:
+
+env:
+  AWS_REGION: us-east-1
+  IMAGE_TAG: ${{ github.sha }}
+
+jobs:
+  build-and-push:
+    name: Build and Push Images
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    outputs:
+      ecr_registry: ${{ steps.login-ecr.outputs.registry }}
+
+    strategy:
+      matrix:
+        service: [auth-service, user-service, project-service, task-service, tracker-service, inbox-service, frontend]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          role-duration-seconds: 3600
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./${{ matrix.service }}
+          push: true
+          tags: |
+            ${{ steps.login-ecr.outputs.registry }}/tasky/${{ matrix.service }}:${{ env.IMAGE_TAG }}
+            ${{ steps.login-ecr.outputs.registry }}/tasky/${{ matrix.service }}:latest
+
+  deploy:
     name: Deploy to EC2
     runs-on: ubuntu-latest
     needs: build-and-push
     environment: production
+    permissions:
+      contents: read
+      id-token: write
 
     steps:
       - name: Checkout code
