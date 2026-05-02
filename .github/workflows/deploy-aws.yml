@@ -1,5 +1,7 @@
 name: Deploy to AWS ECS
 
+# Fixed workflow order: deploy infra -> build images -> update services
+
 on:
   push:
     branches: [main, release-1]
