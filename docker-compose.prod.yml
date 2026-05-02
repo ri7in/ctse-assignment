@@ -1,14 +1,26 @@
 name: tasky
 
 # ─────────────────────────────────────────────
-# Reusable fragments (YAML anchors)
+# Production compose — references prebuilt images from ECR.
+# Variables (resolved at deploy time via the workflow):
+#   ECR_REGISTRY                 e.g. 1234.dkr.ecr.us-east-1.amazonaws.com
+#   IMAGE_TAG                    e.g. <git-sha>
+#   JWT_SECRET
+#   FIREBASE_DATABASE_URL
+#   FIREBASE_SERVICE_ACCOUNT
 # ─────────────────────────────────────────────
+
 x-node-defaults: &node-defaults
   init: true
   restart: unless-stopped
   networks: [tasky-net]
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "3"
   environment: &node-env
-    NODE_ENV: development
+    NODE_ENV: production
     KAFKAJS_NO_PARTITIONER_WARNING: '1'
 
 x-kafka-deps: &kafka-deps
@@ -17,12 +29,6 @@ x-kafka-deps: &kafka-deps
   kafka:
     condition: service_healthy
 
-x-mongo-deps: &mongo-deps
-  mongodb:
-    condition: service_healthy
-
-# Healthcheck for any Node service exposing /health on its PORT.
-# Uses Node itself so we don't depend on curl/wget being present in alpine images.
 x-node-healthcheck: &node-healthcheck
   test:
     - CMD
@@ -40,9 +46,6 @@ x-node-healthcheck: &node-healthcheck
   start_period: 90s
 
 services:
-  # ─────────────────────────────────────────────
-  # Apache Kafka (KRaft mode — no ZooKeeper)
-  # ─────────────────────────────────────────────
   kafka:
     image: apache/kafka:3.7.0
     container_name: tasky-kafka
@@ -71,17 +74,19 @@ services:
       retries: 10
       start_period: 30s
     networks: [tasky-net]
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
-  # ─────────────────────────────────────────────
-  # MongoDB
-  # ─────────────────────────────────────────────
   mongodb:
     image: mongo:7
     container_name: tasky-mongodb
     init: true
     restart: unless-stopped
     volumes:
-      - mongo_data:/data/db
+      - mongodb_data:/data/db
     healthcheck:
       test: ['CMD', 'mongosh', '--quiet', '--eval', 'db.adminCommand("ping").ok']
       interval: 10s
@@ -89,52 +94,50 @@ services:
       retries: 5
       start_period: 20s
     networks: [tasky-net]
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
-  # ─────────────────────────────────────────────
-  # Auth Service (3000)
-  # ─────────────────────────────────────────────
   auth-service:
     <<: *node-defaults
-    build: ./auth-service
+    image: ${ECR_REGISTRY}/tasky/auth-service:${IMAGE_TAG}
     container_name: tasky-auth
-    env_file: ./auth-service/.env
     environment:
       <<: *node-env
       PORT: '3000'
       MONGODB_URI: 'mongodb://mongodb:27017/tasktracker-auth'
-    depends_on: *mongo-deps
+      JWT_SECRET: ${JWT_SECRET}
+    depends_on:
+      mongodb:
+        condition: service_healthy
     healthcheck: *node-healthcheck
 
-  # ─────────────────────────────────────────────
-  # User Service (3001)
-  # ─────────────────────────────────────────────
   user-service:
     <<: *node-defaults
-    build: ./user-service
+    image: ${ECR_REGISTRY}/tasky/user-service:${IMAGE_TAG}
     container_name: tasky-user
-    env_file: ./user-service/.env
     environment:
       <<: *node-env
       PORT: '3001'
       MONGODB_URI: 'mongodb://mongodb:27017/tasktracker-users'
+      JWT_SECRET: ${JWT_SECRET}
       AUTH_SERVICE_URL: 'http://auth-service:3000'
       KAFKA_BROKER: 'kafka:9092'
       KAFKA_CLIENT_ID: 'user-service'
     depends_on: *kafka-deps
     healthcheck: *node-healthcheck
 
-  # ─────────────────────────────────────────────
-  # Project Service (3002)
-  # ─────────────────────────────────────────────
   project-service:
     <<: *node-defaults
-    build: ./project-service
+    image: ${ECR_REGISTRY}/tasky/project-service:${IMAGE_TAG}
     container_name: tasky-project
-    env_file: ./project-service/.env
     environment:
       <<: *node-env
       PORT: '3002'
       MONGODB_URI: 'mongodb://mongodb:27017/tasktracker-projects'
+      JWT_SECRET: ${JWT_SECRET}
       AUTH_SERVICE_URL: 'http://auth-service:3000'
       KAFKA_BROKER: 'kafka:9092'
       KAFKA_CLIENT_ID: 'project-service'
@@ -142,18 +145,15 @@ services:
     depends_on: *kafka-deps
     healthcheck: *node-healthcheck
 
-  # ─────────────────────────────────────────────
-  # Task Service (3003)
-  # ─────────────────────────────────────────────
   task-service:
     <<: *node-defaults
-    build: ./task-service
+    image: ${ECR_REGISTRY}/tasky/task-service:${IMAGE_TAG}
     container_name: tasky-task
-    env_file: ./task-service/.env
     environment:
       <<: *node-env
       PORT: '3003'
       MONGODB_URI: 'mongodb://mongodb:27017/tasktracker-tasks'
+      JWT_SECRET: ${JWT_SECRET}
       AUTH_SERVICE_URL: 'http://auth-service:3000'
       KAFKA_BROKER: 'kafka:9092'
       KAFKA_CLIENT_ID: 'task-service'
@@ -161,18 +161,15 @@ services:
     depends_on: *kafka-deps
     healthcheck: *node-healthcheck
 
-  # ─────────────────────────────────────────────
-  # Tracker Service (3004)
-  # ─────────────────────────────────────────────
   tracker-service:
     <<: *node-defaults
-    build: ./tracker-service
+    image: ${ECR_REGISTRY}/tasky/tracker-service:${IMAGE_TAG}
     container_name: tasky-tracker
-    env_file: ./tracker-service/.env
     environment:
       <<: *node-env
       PORT: '3004'
       MONGODB_URI: 'mongodb://mongodb:27017/tasktracker-tracker'
+      JWT_SECRET: ${JWT_SECRET}
       AUTH_SERVICE_URL: 'http://auth-service:3000'
       KAFKA_BROKER: 'kafka:9092'
       KAFKA_CLIENT_ID: 'tracker-service'
@@ -180,36 +177,28 @@ services:
     depends_on: *kafka-deps
     healthcheck: *node-healthcheck
 
-  # ─────────────────────────────────────────────
-  # Inbox Service (3005)
-  # ─────────────────────────────────────────────
   inbox-service:
     <<: *node-defaults
-    build: ./inbox-service
+    image: ${ECR_REGISTRY}/tasky/inbox-service:${IMAGE_TAG}
     container_name: tasky-inbox
-    env_file: ./inbox-service/.env
     environment:
       <<: *node-env
       PORT: '3005'
       MONGODB_URI: 'mongodb://mongodb:27017/tasktracker-inbox'
+      JWT_SECRET: ${JWT_SECRET}
       AUTH_SERVICE_URL: 'http://auth-service:3000'
       KAFKA_BROKER: 'kafka:9092'
       KAFKA_CLIENT_ID: 'inbox-service'
       KAFKA_GROUP_ID: 'tasky-inbox-group'
+      FIREBASE_DATABASE_URL: ${FIREBASE_DATABASE_URL}
+      FIREBASE_SERVICE_ACCOUNT: ${FIREBASE_SERVICE_ACCOUNT}
     depends_on: *kafka-deps
     healthcheck: *node-healthcheck
 
-  # ─────────────────────────────────────────────
-  # Frontend (React + Vite → static via nginx)
-  # ─────────────────────────────────────────────
   frontend:
     init: true
     restart: unless-stopped
-    build:
-      context: ./frontend
-      args:
-        # Same-origin: API calls go to /api/* and the gateway routes them
-        VITE_API_BASE_URL: '/'
+    image: ${ECR_REGISTRY}/tasky/frontend:${IMAGE_TAG}
     container_name: tasky-frontend
     networks: [tasky-net]
     healthcheck:
@@ -218,17 +207,19 @@ services:
       timeout: 3s
       retries: 5
       start_period: 5s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
-  # ─────────────────────────────────────────────
-  # Nginx — single entry point on host:3080
-  # ─────────────────────────────────────────────
   nginx:
     init: true
     restart: unless-stopped
-    build: ./nginx
+    image: ${ECR_REGISTRY}/tasky/nginx:${IMAGE_TAG}
     container_name: tasky-nginx
     ports:
-      - '3080:80'
+      - '80:80'
     depends_on:
       auth-service:    { condition: service_healthy }
       user-service:    { condition: service_healthy }
@@ -244,10 +235,15 @@ services:
       timeout: 3s
       retries: 5
       start_period: 5s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
 volumes:
   kafka_data:
-  mongo_data:
+  mongodb_data:
 
 networks:
   tasky-net:
