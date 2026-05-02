@@ -1,0 +1,177 @@
+name: Deploy to EC2
+
+on:
+  push:
+    branches: [release-1]
+  workflow_dispatch:
+
+env:
+  AWS_REGION: us-east-1
+  IMAGE_TAG: ${{ github.sha }}
+
+jobs:
+  build-and-push:
+    name: Build and Push Images
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    outputs:
+      ecr_registry: ${{ steps.login-ecr.outputs.registry }}
+
+    strategy:
+      matrix:
+        service: [auth-service, user-service, project-service, task-service, tracker-service, inbox-service, frontend]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          role-duration-seconds: 3600
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./${{ matrix.service }}
+          push: true
+          tags: |
+            ${{ steps.login-ecr.outputs.registry }}/tasky/${{ matrix.service }}:${{ env.IMAGE_TAG }}
+            ${{ steps.login-ecr.outputs.registry }}/tasky/${{ matrix.service }}:latest
+
+  deploy:
+    name: Deploy to EC2
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    environment: production
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          role-duration-seconds: 3600
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ec2-user
+          key: ${{ secrets.EC2_SSH_KEY }}
+          timeout: 300s
+          script: |
+            ECR_REGISTRY="${{ steps.login-ecr.outputs.registry }}"
+            IMAGE_TAG="${{ env.IMAGE_TAG }}"
+
+            # Authenticate Docker with ECR
+            aws ecr get-login-password --region ${{ env.AWS_REGION }} | \
+              docker login --username AWS --password-stdin $ECR_REGISTRY
+
+            # Write docker-compose file
+            cat > ~/docker-compose.yml << EOF
+            version: '3.8'
+            services:
+              auth-service:
+                image: $ECR_REGISTRY/tasky/auth-service:$IMAGE_TAG
+                ports:
+                  - "3000:3000"
+                environment:
+                  MONGODB_URI: "${{ secrets.MONGODB_URI }}"
+                  JWT_SECRET: "${{ secrets.JWT_SECRET }}"
+                  NODE_ENV: production
+                restart: unless-stopped
+
+              user-service:
+                image: $ECR_REGISTRY/tasky/user-service:$IMAGE_TAG
+                ports:
+                  - "3001:3001"
+                environment:
+                  MONGODB_URI: "${{ secrets.MONGODB_URI }}"
+                  JWT_SECRET: "${{ secrets.JWT_SECRET }}"
+                  NODE_ENV: production
+                restart: unless-stopped
+
+              project-service:
+                image: $ECR_REGISTRY/tasky/project-service:$IMAGE_TAG
+                ports:
+                  - "3002:3002"
+                environment:
+                  MONGODB_URI: "${{ secrets.MONGODB_URI }}"
+                  JWT_SECRET: "${{ secrets.JWT_SECRET }}"
+                  NODE_ENV: production
+                restart: unless-stopped
+
+              task-service:
+                image: $ECR_REGISTRY/tasky/task-service:$IMAGE_TAG
+                ports:
+                  - "3003:3003"
+                environment:
+                  MONGODB_URI: "${{ secrets.MONGODB_URI }}"
+                  JWT_SECRET: "${{ secrets.JWT_SECRET }}"
+                  NODE_ENV: production
+                restart: unless-stopped
+
+              tracker-service:
+                image: $ECR_REGISTRY/tasky/tracker-service:$IMAGE_TAG
+                ports:
+                  - "3004:3004"
+                environment:
+                  MONGODB_URI: "${{ secrets.MONGODB_URI }}"
+                  JWT_SECRET: "${{ secrets.JWT_SECRET }}"
+                  NODE_ENV: production
+                restart: unless-stopped
+
+              inbox-service:
+                image: $ECR_REGISTRY/tasky/inbox-service:$IMAGE_TAG
+                ports:
+                  - "3005:3005"
+                environment:
+                  MONGODB_URI: "${{ secrets.MONGODB_URI }}"
+                  JWT_SECRET: "${{ secrets.JWT_SECRET }}"
+                  NODE_ENV: production
+                restart: unless-stopped
+
+              frontend:
+                image: $ECR_REGISTRY/tasky/frontend:$IMAGE_TAG
+                ports:
+                  - "80:80"
+                environment:
+                  NODE_ENV: production
+                restart: unless-stopped
+            EOF
+
+            # Pull new images and restart
+            docker-compose pull
+            docker-compose up -d --remove-orphans
+
+            # Clean up old images
+            docker image prune -f
+
+      - name: Health check
+        run: |
+          sleep 15
+          curl --fail http://${{ secrets.EC2_HOST }} || exit 1
+
+      - name: Deployment summary
+        run: |
+          echo "### Deployment Successful" >> $GITHUB_STEP_SUMMARY
+          echo "- Commit: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "- App URL: http://${{ secrets.EC2_HOST }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Branch: ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Time: $(date)" >> $GITHUB_STEP_SUMMARY
