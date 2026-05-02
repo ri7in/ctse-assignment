@@ -136,6 +136,21 @@ jobs:
             set -euo pipefail
             cd /home/ec2-user/tasky
 
+            # Ensure Docker Compose v2 plugin is installed (Amazon Linux 2 ships v1 only).
+            # Idempotent — re-runs are no-ops once the plugin is in place.
+            if ! docker compose version >/dev/null 2>&1; then
+              echo "Installing docker compose v2 plugin..."
+              ARCH="$(uname -m)"
+              COMPOSE_VERSION="v2.27.0"
+              PLUGIN_DIR="/usr/local/lib/docker/cli-plugins"
+              sudo mkdir -p "$PLUGIN_DIR"
+              sudo curl -fsSL \
+                "https://github.com/docker/compose/releases/download/${COMPOSE_VERSION}/docker-compose-linux-${ARCH}" \
+                -o "${PLUGIN_DIR}/docker-compose"
+              sudo chmod +x "${PLUGIN_DIR}/docker-compose"
+              docker compose version
+            fi
+
             # Lock down the env file (contains secrets)
             chmod 600 deploy.env
 
