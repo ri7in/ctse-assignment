@@ -53,8 +53,6 @@ jobs:
           tags: |
             ${{ env.ECR_REGISTRY }}/tasky/${{ matrix.service }}:${{ env.IMAGE_TAG }}
             ${{ env.ECR_REGISTRY }}/tasky/${{ matrix.service }}:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
 
   deploy:
     name: Deploy to ECS
