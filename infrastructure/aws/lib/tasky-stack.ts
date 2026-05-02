@@ -3,16 +3,14 @@ import { Construct } from "constructs";
 import * as ec2 from "aws-cdk-lib/aws-ec2";
 import * as ecs from "aws-cdk-lib/aws-ecs";
 import * as ecr from "aws-cdk-lib/aws-ecr";
-import * as docdb from "aws-cdk-lib/aws-docdb";
 import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
 import * as elbv2 from "aws-cdk-lib/aws-elasticloadbalancingv2";
-import * as iam from "aws-cdk-lib/aws-iam";
 
 export class TaskyStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
 
-    // VPC - public subnets only to avoid NAT gateway costs
+    // Minimal VPC - public subnets only, no NAT cost
     const vpc = new ec2.Vpc(this, "TaskyVpc", {
       maxAzs: 2,
       natGateways: 0,
@@ -25,70 +23,44 @@ export class TaskyStack extends cdk.Stack {
       ],
     });
 
-    // ALB security group
-    const albSecurityGroup = new ec2.SecurityGroup(
-      this,
-      "TaskyAlbSecurityGroup",
-      {
-        vpc,
-        description: "Security group for Tasky ALB",
-      },
-    );
+    const albSecurityGroup = new ec2.SecurityGroup(this, "AlbSG", {
+      vpc,
+      description: "ALB security group",
+    });
     albSecurityGroup.addIngressRule(
       ec2.Peer.anyIpv4(),
       ec2.Port.tcp(80),
-      "Allow HTTP",
+      "HTTP",
     );
 
-    // ECS security group - only accepts traffic from ALB
-    const ecsSecurityGroup = new ec2.SecurityGroup(
-      this,
-      "TaskyEcsSecurityGroup",
-      {
-        vpc,
-        description: "Security group for Tasky ECS tasks",
-      },
-    );
-    ecsSecurityGroup.addIngressRule(
-      albSecurityGroup,
-      ec2.Port.allTcp(),
-      "Allow traffic from ALB",
-    );
-
-    // DocumentDB security group
-    const docDbSecurityGroup = new ec2.SecurityGroup(
-      this,
-      "TaskyDocDbSecurityGroup",
-      {
-        vpc,
-        description: "Security group for Tasky DocumentDB",
-      },
-    );
-    docDbSecurityGroup.addIngressRule(
-      ecsSecurityGroup,
-      ec2.Port.tcp(27017),
-      "Allow ECS tasks to access DocumentDB",
-    );
-
-    const documentDb = new docdb.DatabaseCluster(this, "TaskyDocumentDb", {
-      masterUser: { username: "taskyadmin" },
-      instanceType: ec2.InstanceType.of(
-        ec2.InstanceClass.T3,
-        ec2.InstanceSize.MEDIUM,
-      ),
+    const ecsSG = new ec2.SecurityGroup(this, "EcsSG", {
       vpc,
-      vpcSubnets: { subnetType: ec2.SubnetType.PUBLIC },
-      securityGroup: docDbSecurityGroup,
-      removalPolicy: cdk.RemovalPolicy.DESTROY,
+      description: "ECS security group",
+    });
+    ecsSG.addIngressRule(albSecurityGroup, ec2.Port.allTcp(), "From ALB");
+
+    // Store MongoDB URI in Secrets Manager
+    const mongoSecret = new secretsmanager.Secret(this, "MongoUri", {
+      secretName: "tasky/mongodb-uri",
+      secretStringValue: cdk.SecretValue.unsafePlainText(
+        process.env.MONGODB_URI || "",
+      ),
     });
 
-    // ECS Cluster
+    const jwtSecret = new secretsmanager.Secret(this, "JwtSecret", {
+      secretName: "tasky/jwt-secret",
+      generateSecretString: {
+        secretStringTemplate: JSON.stringify({}),
+        generateStringKey: "secret",
+        passwordLength: 32,
+      },
+    });
+
     const cluster = new ecs.Cluster(this, "TaskyCluster", {
       clusterName: "TaskyCluster",
       vpc,
     });
 
-    // ECR Repositories
     const serviceList = [
       "auth-service",
       "user-service",
@@ -107,36 +79,19 @@ export class TaskyStack extends cdk.Stack {
       });
     });
 
-    // JWT Secret
-    const jwtSecret = new secretsmanager.Secret(this, "TaskyJwtSecret", {
-      secretName: "tasky/jwt-secret",
-      generateSecretString: {
-        secretStringTemplate: JSON.stringify({}),
-        generateStringKey: "secret",
-        passwordLength: 32,
-      },
+    const loadBalancer = new elbv2.ApplicationLoadBalancer(this, "ALB", {
+      vpc,
+      internetFacing: true,
+      securityGroup: albSecurityGroup,
     });
 
-    // Shared Application Load Balancer
-    const loadBalancer = new elbv2.ApplicationLoadBalancer(
-      this,
-      "TaskyLoadBalancer",
-      {
-        vpc,
-        internetFacing: true,
-        securityGroup: albSecurityGroup,
-      },
-    );
-
-    const listener = loadBalancer.addListener("HttpListener", {
+    const listener = loadBalancer.addListener("Http", {
       port: 80,
-      protocol: elbv2.ApplicationProtocol.HTTP,
       defaultAction: elbv2.ListenerAction.fixedResponse(404, {
         messageBody: "Not found",
       }),
     });
 
-    // Service definitions
     const serviceConfigs = [
       { name: "auth-service", port: 3000, path: "/api/auth/*", priority: 1 },
       { name: "user-service", port: 3001, path: "/api/users/*", priority: 2 },
@@ -158,172 +113,69 @@ export class TaskyStack extends cdk.Stack {
     ];
 
     serviceConfigs.forEach((config) => {
-      const taskDef = new ecs.FargateTaskDefinition(
-        this,
-        `${config.name}TaskDef`,
-        {
-          cpu: 256,
-          memoryLimitMiB: 512,
-        },
-      );
+      const taskDef = new ecs.FargateTaskDefinition(this, `${config.name}TD`, {
+        cpu: 256,
+        memoryLimitMiB: 512,
+      });
 
-      taskDef.addContainer(`${config.name}Container`, {
+      taskDef.addContainer(`${config.name}C`, {
         image: ecs.ContainerImage.fromEcrRepository(repositories[config.name]),
         portMappings: [{ containerPort: config.port }],
         environment: {
           NODE_ENV: "production",
-          MONGODB_HOST: documentDb.clusterEndpoint.hostname,
-          MONGODB_PORT: documentDb.clusterEndpoint.port.toString(),
-          MONGODB_USERNAME: "taskyadmin",
-          JWT_SECRET_ARN: jwtSecret.secretArn,
           KAFKA_BROKER: "",
           KAFKA_CLIENT_ID: config.name,
           KAFKA_GROUP_ID: `tasky-${config.name.replace("-service", "")}-group`,
         },
         secrets: {
-          MONGODB_PASSWORD: ecs.Secret.fromSecretsManager(
-            documentDb.secret!,
-            "password",
-          ),
+          MONGODB_URI: ecs.Secret.fromSecretsManager(mongoSecret),
           JWT_SECRET: ecs.Secret.fromSecretsManager(jwtSecret, "secret"),
         },
         logging: ecs.LogDrivers.awsLogs({ streamPrefix: config.name }),
       });
 
-      // Grant ECR pull permissions
       repositories[config.name].grantPull(taskDef.executionRole!);
-
-      // Grant Secrets Manager access
+      mongoSecret.grantRead(taskDef.taskRole);
       jwtSecret.grantRead(taskDef.taskRole);
-      documentDb.secret!.grantRead(taskDef.taskRole);
 
-      const fargateService = new ecs.FargateService(
-        this,
-        `${config.name}Service`,
-        {
-          cluster,
-          serviceName: config.name,
-          taskDefinition: taskDef,
-          desiredCount: 1,
-          assignPublicIp: true, // Required without NAT gateway
-          vpcSubnets: { subnetType: ec2.SubnetType.PUBLIC },
-          securityGroups: [ecsSecurityGroup],
-        },
-      );
+      const fargateService = new ecs.FargateService(this, `${config.name}Svc`, {
+        cluster,
+        serviceName: config.name,
+        taskDefinition: taskDef,
+        desiredCount: 1,
+        assignPublicIp: true,
+        vpcSubnets: { subnetType: ec2.SubnetType.PUBLIC },
+        securityGroups: [ecsSG],
+      });
 
-      const targetGroup = new elbv2.ApplicationTargetGroup(
-        this,
-        `${config.name}TG`,
-        {
-          vpc,
-          targetGroupName: `${config.name}-tg`,
-          port: config.port,
-          protocol: elbv2.ApplicationProtocol.HTTP,
-          targets: [fargateService],
-          healthCheck: {
-            path: "/health",
-            interval: cdk.Duration.seconds(30),
-            timeout: cdk.Duration.seconds(5),
-            healthyThresholdCount: 2,
-            unhealthyThresholdCount: 3,
-          },
+      const tg = new elbv2.ApplicationTargetGroup(this, `${config.name}TG`, {
+        vpc,
+        targetGroupName: `${config.name}-tg`,
+        port: config.port,
+        protocol: elbv2.ApplicationProtocol.HTTP,
+        targets: [fargateService],
+        healthCheck: {
+          path: "/health",
+          interval: cdk.Duration.seconds(30),
+          timeout: cdk.Duration.seconds(5),
+          healthyThresholdCount: 2,
+          unhealthyThresholdCount: 3,
         },
-      );
+      });
 
       listener.addTargetGroups(`${config.name}Rule`, {
-        targetGroups: [targetGroup],
+        targetGroups: [tg],
         conditions: [elbv2.ListenerCondition.pathPatterns([config.path])],
         priority: config.priority,
       });
     });
 
-    // Outputs
     new cdk.CfnOutput(this, "LoadBalancerDNS", {
       value: loadBalancer.loadBalancerDnsName,
-      description: "Application Load Balancer DNS Name",
-    });
-
-    new cdk.CfnOutput(this, "DocumentDBEndpoint", {
-      value: documentDb.clusterEndpoint.hostname,
-      description: "DocumentDB Cluster Endpoint",
     });
 
     new cdk.CfnOutput(this, "ECRRepositories", {
       value: serviceList.map((s) => repositories[s].repositoryUri).join(", "),
-      description: "ECR Repository URIs",
-    });
-
-    // CDK Deploy Policy
-    const cdkDeployPolicyDocument = new iam.PolicyDocument({
-      statements: [
-        new iam.PolicyStatement({
-          sid: "SSMBootstrapVersion",
-          effect: iam.Effect.ALLOW,
-          actions: ["ssm:GetParameter"],
-          resources: [
-            "arn:aws:ssm:us-east-1:060795913726:parameter/cdk-bootstrap/*",
-          ],
-        }),
-        new iam.PolicyStatement({
-          sid: "AssumeBootstrapRoles",
-          effect: iam.Effect.ALLOW,
-          actions: ["sts:AssumeRole"],
-          resources: [
-            "arn:aws:iam::060795913726:role/cdk-hnb659fds-deploy-role-060795913726-us-east-1",
-            "arn:aws:iam::060795913726:role/cdk-hnb659fds-file-publishing-role-060795913726-us-east-1",
-            "arn:aws:iam::060795913726:role/cdk-hnb659fds-image-publishing-role-060795913726-us-east-1",
-            "arn:aws:iam::060795913726:role/cdk-hnb659fds-lookup-role-060795913726-us-east-1",
-          ],
-        }),
-        new iam.PolicyStatement({
-          sid: "ECRAccess",
-          effect: iam.Effect.ALLOW,
-          actions: [
-            "ecr:GetAuthorizationToken",
-            "ecr:BatchCheckLayerAvailability",
-            "ecr:GetDownloadUrlForLayer",
-            "ecr:BatchGetImage",
-            "ecr:PutImage",
-            "ecr:InitiateLayerUpload",
-            "ecr:UploadLayerPart",
-            "ecr:CompleteLayerUpload",
-            "ecr:CreateRepository",
-            "ecr:DescribeRepositories",
-          ],
-          resources: ["*"],
-        }),
-        new iam.PolicyStatement({
-          sid: "ECSAccess",
-          effect: iam.Effect.ALLOW,
-          actions: [
-            "ecs:UpdateService",
-            "ecs:DescribeServices",
-            "ecs:DescribeClusters",
-            "ecs:ListServices",
-          ],
-          resources: ["*"],
-        }),
-        new iam.PolicyStatement({
-          sid: "CloudFormationDescribe",
-          effect: iam.Effect.ALLOW,
-          actions: ["cloudformation:DescribeStacks"],
-          resources: ["*"],
-        }),
-      ],
-    });
-
-    const cdkDeployPolicy = new iam.ManagedPolicy(
-      this,
-      "TaskyCdkDeployPolicy",
-      {
-        managedPolicyName: "TaskyCdkDeployPolicy",
-        document: cdkDeployPolicyDocument,
-      },
-    );
-
-    new cdk.CfnOutput(this, "CdkDeployPolicyArn", {
-      value: cdkDeployPolicy.managedPolicyArn,
-      description: "ARN of the CDK Deploy Managed Policy",
     });
   }
 }
