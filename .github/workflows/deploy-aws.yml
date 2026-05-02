@@ -26,6 +26,9 @@ jobs:
     name: Deploy Infrastructure
     runs-on: ubuntu-latest
     environment: ${{ github.event.inputs.environment || 'production' }}
+    permissions:
+      contents: read
+      id-token: write
 
     steps:
       - name: Checkout code
@@ -62,6 +65,9 @@ jobs:
     runs-on: ubuntu-latest
     needs: build-and-push
     environment: ${{ github.event.inputs.environment || 'production' }}
+    permissions:
+      contents: read
+      id-token: write
 
     steps:
       - name: Checkout code
