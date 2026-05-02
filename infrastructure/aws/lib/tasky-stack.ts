@@ -260,7 +260,9 @@ export class TaskyStack extends cdk.Stack {
           sid: "SSMBootstrapVersion",
           effect: iam.Effect.ALLOW,
           actions: ["ssm:GetParameter"],
-          resources: ["arn:aws:ssm:us-east-1:060795913726:parameter/cdk-bootstrap/*"],
+          resources: [
+            "arn:aws:ssm:us-east-1:060795913726:parameter/cdk-bootstrap/*",
+          ],
         }),
         new iam.PolicyStatement({
           sid: "AssumeBootstrapRoles",
@@ -310,10 +312,14 @@ export class TaskyStack extends cdk.Stack {
       ],
     });
 
-    const cdkDeployPolicy = new iam.ManagedPolicy(this, "TaskyCdkDeployPolicy", {
-      managedPolicyName: "TaskyCdkDeployPolicy",
-      document: cdkDeployPolicyDocument,
-    });
+    const cdkDeployPolicy = new iam.ManagedPolicy(
+      this,
+      "TaskyCdkDeployPolicy",
+      {
+        managedPolicyName: "TaskyCdkDeployPolicy",
+        document: cdkDeployPolicyDocument,
+      },
+    );
 
     new cdk.CfnOutput(this, "CdkDeployPolicyArn", {
       value: cdkDeployPolicy.managedPolicyArn,
