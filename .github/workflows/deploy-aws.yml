@@ -46,10 +46,6 @@ jobs:
         working-directory: infrastructure/aws
         run: npm ci
 
-      - name: Bootstrap CDK (if needed)
-        working-directory: infrastructure/aws
-        run: cdk bootstrap || true
-
       - name: Deploy Infrastructure
         working-directory: infrastructure/aws
         run: cdk deploy --require-approval never
