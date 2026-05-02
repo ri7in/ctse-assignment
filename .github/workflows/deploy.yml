@@ -75,77 +75,179 @@ jobs:
         run: |
           ECR_REGISTRY=${{ steps.login-ecr.outputs.registry }}
           IMAGE_TAG=${{ env.IMAGE_TAG }}
-          cat > docker-compose.yml << EOF
+          cat > docker-compose.yml << 'COMPOSEFILE'
           version: '3.8'
+
+          volumes:
+            mongodb_data:
+            zookeeper_data:
+            kafka_data:
+
           services:
+            mongodb:
+              image: mongo:6
+              restart: unless-stopped
+              volumes:
+                - mongodb_data:/data/db
+              ports:
+                - "27017:27017"
+
+            zookeeper:
+              image: confluentinc/cp-zookeeper:7.4.0
+              restart: unless-stopped
+              environment:
+                ZOOKEEPER_CLIENT_PORT: 2181
+                ZOOKEEPER_TICK_TIME: 2000
+              volumes:
+                - zookeeper_data:/var/lib/zookeeper/data
+
+            kafka:
+              image: confluentinc/cp-kafka:7.4.0
+              restart: unless-stopped
+              depends_on:
+                - zookeeper
+              ports:
+                - "9092:9092"
+              environment:
+                KAFKA_BROKER_ID: 1
+                KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+                KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+                KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+                KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+              volumes:
+                - kafka_data:/var/lib/kafka/data
+
             auth-service:
-              image: $ECR_REGISTRY/tasky/auth-service:$IMAGE_TAG
+              image: ECR_REGISTRY_PLACEHOLDER/tasky/auth-service:IMAGE_TAG_PLACEHOLDER
               ports:
                 - "3000:3000"
+              depends_on:
+                - mongodb
               environment:
-                MONGODB_URI: "${{ secrets.MONGODB_URI }}"
-                JWT_SECRET: "${{ secrets.JWT_SECRET }}"
+                PORT: "3000"
+                MONGODB_URI: "mongodb://mongodb:27017/tasktracker-auth"
+                JWT_SECRET: "JWT_SECRET_PLACEHOLDER"
                 NODE_ENV: production
               restart: unless-stopped
 
             user-service:
-              image: $ECR_REGISTRY/tasky/user-service:$IMAGE_TAG
+              image: ECR_REGISTRY_PLACEHOLDER/tasky/user-service:IMAGE_TAG_PLACEHOLDER
               ports:
                 - "3001:3001"
+              depends_on:
+                - mongodb
+                - kafka
               environment:
-                MONGODB_URI: "${{ secrets.MONGODB_URI }}"
-                JWT_SECRET: "${{ secrets.JWT_SECRET }}"
+                PORT: "3001"
+                MONGODB_URI: "mongodb://mongodb:27017/tasktracker-users"
+                JWT_SECRET: "JWT_SECRET_PLACEHOLDER"
+                AUTH_SERVICE_URL: "http://auth-service:3000"
                 NODE_ENV: production
+                KAFKA_BROKER: "kafka:9092"
+                KAFKA_CLIENT_ID: user-service
               restart: unless-stopped
 
             project-service:
-              image: $ECR_REGISTRY/tasky/project-service:$IMAGE_TAG
+              image: ECR_REGISTRY_PLACEHOLDER/tasky/project-service:IMAGE_TAG_PLACEHOLDER
               ports:
                 - "3002:3002"
+              depends_on:
+                - mongodb
+                - kafka
               environment:
-                MONGODB_URI: "${{ secrets.MONGODB_URI }}"
-                JWT_SECRET: "${{ secrets.JWT_SECRET }}"
+                PORT: "3002"
+                MONGODB_URI: "mongodb://mongodb:27017/tasktracker-projects"
+                JWT_SECRET: "JWT_SECRET_PLACEHOLDER"
+                AUTH_SERVICE_URL: "http://auth-service:3000"
                 NODE_ENV: production
+                KAFKA_BROKER: "kafka:9092"
+                KAFKA_CLIENT_ID: project-service
+                KAFKA_GROUP_ID: tasky-project-group
               restart: unless-stopped
 
             task-service:
-              image: $ECR_REGISTRY/tasky/task-service:$IMAGE_TAG
+              image: ECR_REGISTRY_PLACEHOLDER/tasky/task-service:IMAGE_TAG_PLACEHOLDER
               ports:
                 - "3003:3003"
+              depends_on:
+                - mongodb
+                - kafka
               environment:
-                MONGODB_URI: "${{ secrets.MONGODB_URI }}"
-                JWT_SECRET: "${{ secrets.JWT_SECRET }}"
+                PORT: "3003"
+                MONGODB_URI: "mongodb://mongodb:27017/tasktracker-tasks"
+                JWT_SECRET: "JWT_SECRET_PLACEHOLDER"
+                AUTH_SERVICE_URL: "http://auth-service:3000"
                 NODE_ENV: production
+                KAFKA_BROKER: "kafka:9092"
+                KAFKA_CLIENT_ID: task-service
+                KAFKA_GROUP_ID: tasky-task-group
               restart: unless-stopped
 
             tracker-service:
-              image: $ECR_REGISTRY/tasky/tracker-service:$IMAGE_TAG
+              image: ECR_REGISTRY_PLACEHOLDER/tasky/tracker-service:IMAGE_TAG_PLACEHOLDER
               ports:
                 - "3004:3004"
+              depends_on:
+                - mongodb
+                - kafka
               environment:
-                MONGODB_URI: "${{ secrets.MONGODB_URI }}"
-                JWT_SECRET: "${{ secrets.JWT_SECRET }}"
+                PORT: "3004"
+                MONGODB_URI: "mongodb://mongodb:27017/tasktracker-tracker"
+                JWT_SECRET: "JWT_SECRET_PLACEHOLDER"
+                AUTH_SERVICE_URL: "http://auth-service:3000"
                 NODE_ENV: production
+                KAFKA_BROKER: "kafka:9092"
+                KAFKA_CLIENT_ID: tracker-service
+                KAFKA_GROUP_ID: tasky-tracker-group
               restart: unless-stopped
 
             inbox-service:
-              image: $ECR_REGISTRY/tasky/inbox-service:$IMAGE_TAG
+              image: ECR_REGISTRY_PLACEHOLDER/tasky/inbox-service:IMAGE_TAG_PLACEHOLDER
               ports:
                 - "3005:3005"
+              depends_on:
+                - mongodb
+                - kafka
               environment:
-                MONGODB_URI: "${{ secrets.MONGODB_URI }}"
-                JWT_SECRET: "${{ secrets.JWT_SECRET }}"
+                PORT: "3005"
+                MONGODB_URI: "mongodb://mongodb:27017/tasktracker-inbox"
+                JWT_SECRET: "JWT_SECRET_PLACEHOLDER"
+                AUTH_SERVICE_URL: "http://auth-service:3000"
                 NODE_ENV: production
+                KAFKA_BROKER: "kafka:9092"
+                KAFKA_CLIENT_ID: inbox-service
+                KAFKA_GROUP_ID: tasky-inbox-group
+                FIREBASE_DATABASE_URL: "FIREBASE_DATABASE_URL_PLACEHOLDER"
+                FIREBASE_SERVICE_ACCOUNT: "FIREBASE_SERVICE_ACCOUNT_PLACEHOLDER"
               restart: unless-stopped
 
             frontend:
-              image: $ECR_REGISTRY/tasky/frontend:$IMAGE_TAG
+              image: ECR_REGISTRY_PLACEHOLDER/tasky/frontend:IMAGE_TAG_PLACEHOLDER
               ports:
                 - "80:80"
+              depends_on:
+                - auth-service
               environment:
                 NODE_ENV: production
+                VITE_API_BASE_URL: "http://EC2_HOST_PLACEHOLDER"
+                VITE_FIREBASE_CONFIG: 'VITE_FIREBASE_CONFIG_PLACEHOLDER'
               restart: unless-stopped
-          EOF
+          COMPOSEFILE
+
+          # Replace placeholders with actual values
+          sed -i "s|ECR_REGISTRY_PLACEHOLDER|$ECR_REGISTRY|g" docker-compose.yml
+          sed -i "s|IMAGE_TAG_PLACEHOLDER|$IMAGE_TAG|g" docker-compose.yml
+          sed -i "s|JWT_SECRET_PLACEHOLDER|$JWT_SECRET|g" docker-compose.yml
+          sed -i "s|FIREBASE_DATABASE_URL_PLACEHOLDER|$FIREBASE_DATABASE_URL|g" docker-compose.yml
+          sed -i "s|FIREBASE_SERVICE_ACCOUNT_PLACEHOLDER|$FIREBASE_SERVICE_ACCOUNT|g" docker-compose.yml
+          sed -i "s|VITE_FIREBASE_CONFIG_PLACEHOLDER|$VITE_FIREBASE_CONFIG|g" docker-compose.yml
+          sed -i "s|EC2_HOST_PLACEHOLDER|$EC2_HOST|g" docker-compose.yml
+        env:
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          FIREBASE_DATABASE_URL: ${{ secrets.FIREBASE_DATABASE_URL }}
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          VITE_FIREBASE_CONFIG: ${{ secrets.VITE_FIREBASE_CONFIG }}
+          EC2_HOST: ${{ secrets.EC2_HOST }}
 
       - name: Copy docker-compose to EC2
         uses: appleboy/scp-action@v0.1.7
@@ -162,18 +264,20 @@ jobs:
           host: ${{ secrets.EC2_HOST }}
           username: ec2-user
           key: ${{ secrets.EC2_SSH_KEY }}
-          timeout: 300s
+          timeout: 600s
           script: |
             aws ecr get-login-password --region us-east-1 | \
               docker login --username AWS --password-stdin ${{ steps.login-ecr.outputs.registry }}
             docker-compose pull
             docker-compose up -d --remove-orphans
             docker image prune -f
+            echo "Waiting for services to start..."
+            sleep 30
             docker ps
 
       - name: Health check
         run: |
-          sleep 15
+          sleep 20
           curl --fail http://${{ secrets.EC2_HOST }} || exit 1
 
       - name: Deployment summary
