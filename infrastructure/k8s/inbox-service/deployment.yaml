@@ -1,36 +1,42 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: user-service
+  name: inbox-service
   namespace: tasky
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: user-service
+      app: inbox-service
   template:
     metadata:
       labels:
-        app: user-service
+        app: inbox-service
     spec:
       containers:
-        - name: user-service
-          image: ghcr.io/tasky-io/user-service:latest
+        - name: inbox-service
+          image: ghcr.io/tasky-io/inbox-service:latest
           imagePullPolicy: Always
           ports:
-            - containerPort: 3001
+            - containerPort: 3005
           env:
             - name: PORT
-              value: '3001'
+              value: '3005'
             - name: NODE_ENV
               value: 'production'
             - name: AUTH_SERVICE_URL
               value: 'http://auth-service:3000'
+            - name: KAFKA_BROKER
+              value: 'kafka-0.kafka.tasky.svc.cluster.local:9092'
+            - name: KAFKA_CLIENT_ID
+              value: 'inbox-service'
+            - name: KAFKA_GROUP_ID
+              value: 'tasky-inbox-group'
             - name: MONGODB_URI
               valueFrom:
                 secretKeyRef:
                   name: tasky-secrets
-                  key: MONGODB_URI_USERS
+                  key: MONGODB_URI_INBOX
             - name: JWT_SECRET
               valueFrom:
                 secretKeyRef:

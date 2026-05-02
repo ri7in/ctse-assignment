@@ -26,12 +26,6 @@ spec:
               value: 'production'
             - name: AUTH_SERVICE_URL
               value: 'http://auth-service:3000'
-            - name: KAFKA_BROKER
-              value: 'kafka-0.kafka.tasky.svc.cluster.local:9092'
-            - name: KAFKA_CLIENT_ID
-              value: 'project-service'
-            - name: KAFKA_GROUP_ID
-              value: 'tasky-project-group'
             - name: MONGODB_URI
               valueFrom:
                 secretKeyRef:
@@ -49,9 +43,3 @@ spec:
             limits:
               cpu: 200m
               memory: 256Mi
-          readinessProbe:
-            httpGet:
-              path: /health
-              port: 3002
-            initialDelaySeconds: 10
-            periodSeconds: 10
