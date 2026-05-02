@@ -3,6 +3,42 @@
 > **SE4010 Cloud Computing Assignment — SLIIT 2026**
 > Team task & project management platform built with a microservices architecture.
 
+## 🚀 Quick Deploy to AWS (Free Tier)
+
+**One-command deployment to AWS ECS Fargate:**
+
+```bash
+# 1. Configure AWS CLI
+aws configure
+
+# 2. Deploy via GitHub Actions (automatic on push)
+# Or deploy manually:
+.\deploy-aws.ps1 -Bootstrap -Deploy
+```
+
+See [AWS_DEPLOYMENT_README.md](AWS_DEPLOYMENT_README.md) for detailed setup instructions.
+
+## 🏗️ Architecture
+
+- **Frontend**: React.js with Nginx
+- **Backend**: 6 Node.js microservices
+- **Database**: MongoDB (AWS DocumentDB)
+- **Message Queue**: Amazon MSK (Kafka)
+- **Reverse Proxy**: Nginx
+- **Orchestration**: AWS ECS Fargate
+
+## 📦 Services
+
+| Service | Port | Description |
+|---------|------|-------------|
+| auth-service | 3000 | User authentication & authorization |
+| user-service | 3001 | User management |
+| project-service | 3002 | Project management |
+| task-service | 3003 | Task management |
+| tracker-service | 3004 | Activity tracking |
+| inbox-service | 3005 | Notifications |
+| frontend | 80 | React application |
+
 ## Team
 
 | Member | ID | Service |
