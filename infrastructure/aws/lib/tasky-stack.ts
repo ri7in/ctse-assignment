@@ -16,6 +16,18 @@ export class TaskyStack extends cdk.Stack {
     const vpc = new ec2.Vpc(this, 'TaskyVpc', {
       maxAzs: 2,
       natGateways: 0, // Free tier - no NAT gateway
+      subnetConfiguration: [
+        {
+          name: 'Public',
+          subnetType: ec2.SubnetType.PUBLIC,
+          cidrMask: 24,
+        },
+        {
+          name: 'Private',
+          subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS, // Private subnets without NAT
+          cidrMask: 24,
+        },
+      ],
     });
 
     // Security group for ECS tasks
@@ -157,7 +169,8 @@ export class TaskyStack extends cdk.Stack {
         cpu: 256, // 0.25 vCPU - Free tier eligible
         memoryLimitMiB: 512, // 512 MB - Free tier eligible
         securityGroups: [ecsSecurityGroup],
-        assignPublicIp: false,
+        assignPublicIp: true, // Need public IP to pull from ECR
+        taskSubnets: { subnetType: ec2.SubnetType.PUBLIC }, // Place in public subnets
       });
 
       // Add listener rules for path-based routing
