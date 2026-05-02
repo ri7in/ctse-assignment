@@ -113,6 +113,12 @@ jobs:
                 CLUSTER_ID: "MkU3OEVBNTcwNTJENDM2Qk"
               volumes:
                 - kafka_data:/var/lib/kafka/data
+              healthcheck:
+                test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9092"]
+                interval: 10s
+                timeout: 10s
+                retries: 10
+                start_period: 30s
 
             auth-service:
               image: ECR_REGISTRY_PLACEHOLDER/tasky/auth-service:IMAGE_TAG_PLACEHOLDER
@@ -149,8 +155,10 @@ jobs:
               ports:
                 - "3002:3002"
               depends_on:
-                - mongodb
-                - kafka
+                mongodb:
+                  condition: service_started
+                kafka:
+                  condition: service_healthy
               environment:
                 PORT: "3002"
                 MONGODB_URI: "mongodb://mongodb:27017/tasktracker-projects"
