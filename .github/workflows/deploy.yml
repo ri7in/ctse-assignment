@@ -97,15 +97,18 @@ jobs:
             zookeeper:
               image: confluentinc/cp-zookeeper:7.4.0
               restart: unless-stopped
+              hostname: zookeeper
               environment:
                 ZOOKEEPER_CLIENT_PORT: 2181
                 ZOOKEEPER_TICK_TIME: 2000
+                ZOOKEEPER_SERVER_ID: 1
               volumes:
                 - zookeeper_data:/var/lib/zookeeper/data
 
             kafka:
               image: confluentinc/cp-kafka:7.4.0
               restart: unless-stopped
+              hostname: kafka
               depends_on:
                 - zookeeper
               ports:
@@ -114,8 +117,12 @@ jobs:
                 KAFKA_BROKER_ID: 1
                 KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
                 KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+                KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
+                KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
                 KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
                 KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+                KAFKA_ZOOKEEPER_SESSION_TIMEOUT: "6000"
+                KAFKA_ZOOKEEPER_CONNECTION_TIMEOUT_MS: "6000"
               volumes:
                 - kafka_data:/var/lib/kafka/data
 
@@ -263,8 +270,9 @@ jobs:
           script: |
             aws ecr get-login-password --region us-east-1 | \
               docker login --username AWS --password-stdin ${{ steps.login-ecr.outputs.registry }}
+            docker-compose down
             docker-compose pull
-            docker-compose up -d --remove-orphans
+            docker-compose up -d
             docker image prune -f
             echo "Waiting for services to start..."
             sleep 30
