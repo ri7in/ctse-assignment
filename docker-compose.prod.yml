@@ -38,11 +38,13 @@ x-node-healthcheck: &node-healthcheck
       require('http').get('http://127.0.0.1:' + process.env.PORT + '/health',
         r => process.exit(r.statusCode === 200 ? 0 : 1))
         .on('error', () => process.exit(1));
-  interval: 15s
+  interval: 10s
   timeout: 5s
   retries: 5
-  # Generous start_period to absorb a one-shot kafkajs metadata-race crash
-  # (UNKNOWN_TOPIC_OR_PARTITION on a freshly-booted broker) + auto-restart + group rejoin.
+  # start_interval (Docker 25+) probes every 5s during start_period so containers
+  # flip to healthy as soon as they're ready, instead of waiting the full interval.
+  start_interval: 5s
+  # Absorbs the one-shot kafkajs metadata-race crash + auto-restart + group rejoin.
   start_period: 90s
 
 services:

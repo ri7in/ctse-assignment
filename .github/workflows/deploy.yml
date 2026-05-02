@@ -129,7 +129,9 @@ jobs:
           host: ${{ secrets.EC2_HOST }}
           username: ec2-user
           key: ${{ secrets.EC2_SSH_KEY }}
-          timeout: 600s
+          # Generous: covers worst-case image pull + cold-cascade healthcheck wait.
+          timeout: 1200s
+          command_timeout: 1200s
           # ECR_REGISTRY is needed before the inline aws ecr login command.
           envs: AWS_REGION
           script: |
@@ -160,8 +162,8 @@ jobs:
             aws ecr get-login-password --region "$AWS_REGION" \
               | docker login --username AWS --password-stdin "$ECR_REGISTRY"
 
-            docker compose --env-file deploy.env -f docker-compose.prod.yml pull
-            docker compose --env-file deploy.env -f docker-compose.prod.yml up -d --remove-orphans --wait --wait-timeout 300
+            docker compose --env-file deploy.env -f docker-compose.prod.yml pull --quiet
+            docker compose --env-file deploy.env -f docker-compose.prod.yml up -d --remove-orphans --wait --wait-timeout 600
 
             # Scoped cleanup — only dangling images, never touch volumes or unrelated containers.
             docker image prune -f --filter "until=24h"
