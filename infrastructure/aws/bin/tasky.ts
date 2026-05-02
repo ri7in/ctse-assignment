@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import 'source-map-support/register';
 import * as cdk from 'aws-cdk-lib';
-import { TaskyStack } from './lib/tasky-stack';
+import { TaskyStack } from '../lib/tasky-stack';
 
 const app = new cdk.App();
 new TaskyStack(app, 'TaskyStack', {
