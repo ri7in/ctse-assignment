@@ -43,6 +43,8 @@ jobs:
         with:
           context: ./${{ matrix.service }}
           push: true
+          build-args: |
+            ${{ matrix.service == 'frontend' && format('VITE_API_BASE_URL=http://{0}', secrets.EC2_HOST) || '' }}
           tags: |
             ${{ steps.login-ecr.outputs.registry }}/tasky/${{ matrix.service }}:${{ env.IMAGE_TAG }}
             ${{ steps.login-ecr.outputs.registry }}/tasky/${{ matrix.service }}:latest
@@ -229,25 +231,18 @@ jobs:
                 - auth-service
               environment:
                 NODE_ENV: production
-                VITE_API_BASE_URL: "http://EC2_HOST_PLACEHOLDER"
-                VITE_FIREBASE_CONFIG: 'VITE_FIREBASE_CONFIG_PLACEHOLDER'
               restart: unless-stopped
           COMPOSEFILE
 
-          # Replace placeholders with actual values
           sed -i "s|ECR_REGISTRY_PLACEHOLDER|$ECR_REGISTRY|g" docker-compose.yml
           sed -i "s|IMAGE_TAG_PLACEHOLDER|$IMAGE_TAG|g" docker-compose.yml
           sed -i "s|JWT_SECRET_PLACEHOLDER|$JWT_SECRET|g" docker-compose.yml
           sed -i "s|FIREBASE_DATABASE_URL_PLACEHOLDER|$FIREBASE_DATABASE_URL|g" docker-compose.yml
           sed -i "s|FIREBASE_SERVICE_ACCOUNT_PLACEHOLDER|$FIREBASE_SERVICE_ACCOUNT|g" docker-compose.yml
-          sed -i "s|VITE_FIREBASE_CONFIG_PLACEHOLDER|$VITE_FIREBASE_CONFIG|g" docker-compose.yml
-          sed -i "s|EC2_HOST_PLACEHOLDER|$EC2_HOST|g" docker-compose.yml
         env:
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
           FIREBASE_DATABASE_URL: ${{ secrets.FIREBASE_DATABASE_URL }}
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
-          VITE_FIREBASE_CONFIG: ${{ secrets.VITE_FIREBASE_CONFIG }}
-          EC2_HOST: ${{ secrets.EC2_HOST }}
 
       - name: Copy docker-compose to EC2
         uses: appleboy/scp-action@v0.1.7
