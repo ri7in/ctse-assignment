@@ -6,7 +6,7 @@ on:
     paths:
       - 'auth-service/**'
       - '.github/workflows/auth-service.yml'
-
+  workflow_dispatch:
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: tasky-io/auth-service
