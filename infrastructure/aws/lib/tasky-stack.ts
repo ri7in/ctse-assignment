@@ -138,12 +138,18 @@ export class TaskyStack extends cdk.Stack {
           containerPort: config.port,
           environment: {
             NODE_ENV: 'production',
-            MONGODB_URI: documentDb.getConnectionString(),
-            JWT_SECRET: jwtSecret.secretValueFromJson('secret').toString(),
+            MONGODB_HOST: documentDb.clusterEndpoint.hostname,
+            MONGODB_PORT: documentDb.clusterEndpoint.port.toString(),
+            MONGODB_USERNAME: 'taskyadmin',
+            JWT_SECRET_ARN: jwtSecret.secretArn,
             // Kafka not included in free tier - services will work without it
             KAFKA_BROKER: '',
             KAFKA_CLIENT_ID: config.name,
             KAFKA_GROUP_ID: `tasky-${config.name.replace('-service', '')}-group`,
+          },
+          secrets: {
+            MONGODB_PASSWORD: ecs.Secret.fromSecretsManager(documentDb.secret!, 'password'),
+            JWT_SECRET: ecs.Secret.fromSecretsManager(jwtSecret, 'secret'),
           },
         },
         publicLoadBalancer: false, // We'll use a shared ALB
