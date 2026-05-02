@@ -130,6 +130,12 @@ export class TaskyStack extends cdk.Stack {
       internetFacing: true,
     });
 
+    // Create HTTP listener for path-based routing
+    const listener = loadBalancer.addListener('HttpListener', {
+      port: 80,
+      protocol: elbv2.ApplicationProtocol.HTTP,
+    });
+
     // Create ECS services with ALB integration
     const serviceConfigs = [
       { name: 'auth-service', port: 3000, path: '/api/auth/*' },
@@ -173,12 +179,7 @@ export class TaskyStack extends cdk.Stack {
         taskSubnets: { subnetType: ec2.SubnetType.PUBLIC }, // Place in public subnets
       });
 
-      // Add listener rules for path-based routing
-      const listener = loadBalancer.addListener(`${config.name}Listener`, {
-        port: 80,
-        protocol: elbv2.ApplicationProtocol.HTTP,
-      });
-
+      // Add target group to the shared listener
       listener.addTargets(`${config.name}TargetGroup`, {
         targetGroupName: `${config.name}-tg`,
         port: config.port,
@@ -187,6 +188,7 @@ export class TaskyStack extends cdk.Stack {
         conditions: [
           elbv2.ListenerCondition.pathPatterns([config.path]),
         ],
+        priority: serviceConfigs.indexOf(config) + 1, // Priority based on order
         healthCheck: {
           path: '/health',
           interval: cdk.Duration.seconds(30),
