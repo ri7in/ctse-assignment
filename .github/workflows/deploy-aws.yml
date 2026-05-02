@@ -1,15 +1,12 @@
 name: Deploy to AWS ECS
 
-# Fixed workflow order: deploy infra -> build images -> update services
-
 on:
   push:
-    branches: [main, release-1]
+    branches: [release-1]
   workflow_dispatch:
 
 env:
   AWS_REGION: us-east-1
-  ECR_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
   IMAGE_TAG: ${{ github.sha }}
 
 jobs:
@@ -20,6 +17,8 @@ jobs:
     permissions:
       contents: read
       id-token: write
+    outputs:
+      ecr_registry: ${{ steps.login-ecr.outputs.registry }}
 
     steps:
       - name: Checkout code
@@ -30,6 +29,10 @@ jobs:
         with:
           aws-region: ${{ env.AWS_REGION }}
           role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -47,7 +50,7 @@ jobs:
         working-directory: infrastructure/aws
         run: cdk bootstrap || true
 
-      - name: Deploy to AWS
+      - name: Deploy Infrastructure
         working-directory: infrastructure/aws
         run: cdk deploy --require-approval never
 
@@ -55,7 +58,6 @@ jobs:
     name: Build and Push Images
     runs-on: ubuntu-latest
     needs: deploy
-    environment: production
     permissions:
       contents: read
       id-token: write
@@ -84,8 +86,8 @@ jobs:
           context: ./${{ matrix.service }}
           push: true
           tags: |
-            ${{ env.ECR_REGISTRY }}/tasky/${{ matrix.service }}:${{ env.IMAGE_TAG }}
-            ${{ env.ECR_REGISTRY }}/tasky/${{ matrix.service }}:latest
+            ${{ needs.deploy.outputs.ecr_registry }}/tasky/${{ matrix.service }}:${{ env.IMAGE_TAG }}
+            ${{ needs.deploy.outputs.ecr_registry }}/tasky/${{ matrix.service }}:latest
 
   update-services:
     name: Update ECS Services
@@ -97,35 +99,40 @@ jobs:
       id-token: write
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-region: ${{ env.AWS_REGION }}
           role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
+      - name: Force new deployment on all ECS services
+        run: |
+          for SERVICE in auth-service user-service project-service task-service tracker-service inbox-service frontend; do
+            echo "Updating $SERVICE..."
+            aws ecs update-service \
+              --cluster TaskyCluster \
+              --service $SERVICE \
+              --force-new-deployment \
+              --region ${{ env.AWS_REGION }} > /dev/null
+          done
 
-      - name: Install CDK
-        run: npm install -g aws-cdk
-
-      - name: Install dependencies
-        working-directory: infrastructure/aws
-        run: npm ci
-
-      - name: Update ECS Services
-        working-directory: infrastructure/aws
-        run: cdk deploy --require-approval never
+      - name: Wait for services to stabilize
+        run: |
+          for SERVICE in auth-service user-service project-service task-service tracker-service inbox-service frontend; do
+            echo "Waiting for $SERVICE to stabilize..."
+            aws ecs wait services-stable \
+              --cluster TaskyCluster \
+              --services $SERVICE \
+              --region ${{ env.AWS_REGION }}
+          done
 
       - name: Get load balancer URL
         id: get-url
         run: |
-          LB_DNS=$(aws cloudformation describe-stacks --stack-name TaskyStack --query 'Stacks[0].Outputs[?OutputKey==`LoadBalancerDNS`].OutputValue' --output text)
+          LB_DNS=$(aws cloudformation describe-stacks \
+            --stack-name TaskyStack \
+            --query 'Stacks[0].Outputs[?OutputKey==`LoadBalancerDNS`].OutputValue' \
+            --output text)
           echo "load-balancer-url=http://$LB_DNS" >> $GITHUB_OUTPUT
 
       - name: Update deployment status
@@ -133,10 +140,6 @@ jobs:
         with:
           script: |
             const url = '${{ steps.get-url.outputs.load-balancer-url }}';
-            const message = url
-              ? `🚀 **Deployment Successful!**\n\nYour app is live at: ${url}\n\nEnvironment: production\nCommit: ${context.sha}`
-              : `🚀 **Deployment Successful!**\n\nEnvironment: production\nCommit: ${context.sha}\n\n*Load balancer URL will be available shortly...*`;
-
             github.rest.repos.createCommitStatus({
               owner: context.repo.owner,
               repo: context.repo.repo,
