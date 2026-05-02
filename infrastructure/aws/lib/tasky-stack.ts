@@ -6,6 +6,7 @@ import * as ecr from "aws-cdk-lib/aws-ecr";
 import * as docdb from "aws-cdk-lib/aws-docdb";
 import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
 import * as elbv2 from "aws-cdk-lib/aws-elasticloadbalancingv2";
+import * as iam from "aws-cdk-lib/aws-iam";
 
 export class TaskyStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
@@ -250,6 +251,73 @@ export class TaskyStack extends cdk.Stack {
     new cdk.CfnOutput(this, "ECRRepositories", {
       value: serviceList.map((s) => repositories[s].repositoryUri).join(", "),
       description: "ECR Repository URIs",
+    });
+
+    // CDK Deploy Policy
+    const cdkDeployPolicyDocument = new iam.PolicyDocument({
+      statements: [
+        new iam.PolicyStatement({
+          sid: "SSMBootstrapVersion",
+          effect: iam.Effect.ALLOW,
+          actions: ["ssm:GetParameter"],
+          resources: ["arn:aws:ssm:us-east-1:060795913726:parameter/cdk-bootstrap/*"],
+        }),
+        new iam.PolicyStatement({
+          sid: "AssumeBootstrapRoles",
+          effect: iam.Effect.ALLOW,
+          actions: ["sts:AssumeRole"],
+          resources: [
+            "arn:aws:iam::060795913726:role/cdk-hnb659fds-deploy-role-060795913726-us-east-1",
+            "arn:aws:iam::060795913726:role/cdk-hnb659fds-file-publishing-role-060795913726-us-east-1",
+            "arn:aws:iam::060795913726:role/cdk-hnb659fds-image-publishing-role-060795913726-us-east-1",
+            "arn:aws:iam::060795913726:role/cdk-hnb659fds-lookup-role-060795913726-us-east-1",
+          ],
+        }),
+        new iam.PolicyStatement({
+          sid: "ECRAccess",
+          effect: iam.Effect.ALLOW,
+          actions: [
+            "ecr:GetAuthorizationToken",
+            "ecr:BatchCheckLayerAvailability",
+            "ecr:GetDownloadUrlForLayer",
+            "ecr:BatchGetImage",
+            "ecr:PutImage",
+            "ecr:InitiateLayerUpload",
+            "ecr:UploadLayerPart",
+            "ecr:CompleteLayerUpload",
+            "ecr:CreateRepository",
+            "ecr:DescribeRepositories",
+          ],
+          resources: ["*"],
+        }),
+        new iam.PolicyStatement({
+          sid: "ECSAccess",
+          effect: iam.Effect.ALLOW,
+          actions: [
+            "ecs:UpdateService",
+            "ecs:DescribeServices",
+            "ecs:DescribeClusters",
+            "ecs:ListServices",
+          ],
+          resources: ["*"],
+        }),
+        new iam.PolicyStatement({
+          sid: "CloudFormationDescribe",
+          effect: iam.Effect.ALLOW,
+          actions: ["cloudformation:DescribeStacks"],
+          resources: ["*"],
+        }),
+      ],
+    });
+
+    const cdkDeployPolicy = new iam.ManagedPolicy(this, "TaskyCdkDeployPolicy", {
+      managedPolicyName: "TaskyCdkDeployPolicy",
+      document: cdkDeployPolicyDocument,
+    });
+
+    new cdk.CfnOutput(this, "CdkDeployPolicyArn", {
+      value: cdkDeployPolicy.managedPolicyArn,
+      description: "ARN of the CDK Deploy Managed Policy",
     });
   }
 }
