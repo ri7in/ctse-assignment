@@ -2,7 +2,7 @@ name: Deploy to AWS ECS
 
 on:
   push:
-    branches: [main, release-1, trigger-deploy]
+    branches: [main, release-1]
   workflow_dispatch:
     inputs:
       environment:
@@ -11,8 +11,8 @@ on:
         default: 'production'
         type: choice
         options:
-          - production
-          - staging
+        - production
+        - staging
 
 env:
   AWS_REGION: us-east-1
@@ -46,7 +46,7 @@ jobs:
         uses: aws-actions/amazon-ecr-login@v2
 
       - name: Build and push Docker image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v4
         with:
           context: ./${{ matrix.service }}
           push: true
