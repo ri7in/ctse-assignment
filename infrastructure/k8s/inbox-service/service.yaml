@@ -1,11 +1,11 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: auth-service
+  name: inbox-service
   namespace: tasky
 spec:
   selector:
-    app: auth-service
+    app: inbox-service
   ports:
-    - port: 3000
-      targetPort: 3000
+    - port: 3005
+      targetPort: 3005

@@ -5,6 +5,8 @@ namespace: tasky
 
 resources:
   - namespace.yaml
+  - secrets.yaml
+  - ingress.yaml
   - kafka/statefulset.yaml
   - kafka/service.yaml
   - nginx/configmap.yaml
