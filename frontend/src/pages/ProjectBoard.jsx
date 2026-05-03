@@ -68,21 +68,24 @@ function Column({ column, tasks }) {
   return (
     <div style={{
       flex: '0 0 280px',
-      background: C.bg,
+      // Tinted background per status — differentiates lanes at a glance.
+      background: status.bg,
       borderRadius: 14,
       padding: 12,
-      border: isOver ? `2px dashed ${C.accent}` : '2px dashed transparent',
+      border: isOver ? `2px dashed ${C.accent}` : `2px dashed ${status.bg}`,
       transition: 'border-color .15s',
       display: 'flex',
       flexDirection: 'column',
-      maxHeight: 'calc(100vh - 220px)',
+      // Fixed lane height so layout doesn't jump as cards move between columns.
+      height: 'calc(100vh - 220px)',
+      minHeight: 480,
     }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 6px 12px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{ width: 8, height: 8, borderRadius: '50%', background: status.text }} />
           <span style={{ fontSize: 13, fontWeight: 700, color: C.text, letterSpacing: '-.01em' }}>{column.title}</span>
         </div>
-        <span style={{ fontSize: 11, fontWeight: 600, color: C.sub, background: '#fff', borderRadius: 6, padding: '2px 7px' }}>
+        <span style={{ fontSize: 11, fontWeight: 600, color: status.text, background: '#fff', borderRadius: 6, padding: '2px 7px' }}>
           {tasks.length}
         </span>
       </div>
