@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { trackerApi } from '../services/api';
+import { useState, useEffect, useMemo } from 'react';
+import { trackerApi, taskApi, projectApi } from '../services/api';
 import { C, FONT, SHADOW } from '../ds';
 
 function BarChart({ dailyStats }) {
@@ -34,11 +34,19 @@ function BarChart({ dailyStats }) {
 export default function Tracker() {
   const [dashboard, setDashboard] = useState(null);
   const [entries, setEntries] = useState([]);
+  const [tasks, setTasks] = useState([]);
+  const [projects, setProjects] = useState([]);
 
   useEffect(() => {
     trackerApi.getDashboard().then(({ data }) => setDashboard(data)).catch(() => {});
     trackerApi.getEntries().then(({ data }) => setEntries(data)).catch(() => {});
+    taskApi.list().then(({ data }) => setTasks(data)).catch(() => {});
+    projectApi.list().then(({ data }) => setProjects(data)).catch(() => {});
   }, []);
+
+  // Resolve taskId/projectId on each entry to their human names.
+  const taskById = useMemo(() => Object.fromEntries(tasks.map((t) => [t._id, t])), [tasks]);
+  const projectById = useMemo(() => Object.fromEntries(projects.map((p) => [p._id, p])), [projects]);
 
   const totalTime = dashboard?.dailyStats?.reduce((s, d) => s + d.totalMinutes, 0) ?? 0;
   const totalTasks = dashboard?.tasksCompleted ?? 0;
@@ -82,23 +90,40 @@ export default function Tracker() {
             </div>
           ) : (
             <div>
-              {entries.slice(0, 20).map((e, i) => (
-                <div key={e._id} style={{ padding: '16px 24px', borderBottom: i < entries.length - 1 ? '1px solid ' + C.border : 'none', display: 'flex', alignItems: 'center', gap: 16 }}>
-                  <div style={{ width: 38, height: 38, borderRadius: 10, background: C.accentLight, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, flexShrink: 0 }}>⏱</div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 14, fontWeight: 600, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {e.description || 'Work session'}
+              {entries.slice(0, 20).map((e, i) => {
+                const task = taskById[e.taskId];
+                const project = projectById[e.projectId];
+                const taskTitle = task?.title || 'Unknown task';
+                const projectName = project?.name;
+                return (
+                  <div key={e._id} style={{ padding: '16px 24px', borderBottom: i < entries.length - 1 ? '1px solid ' + C.border : 'none', display: 'flex', alignItems: 'center', gap: 16 }}>
+                    <div style={{ width: 38, height: 38, borderRadius: 10, background: C.accentLight, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, flexShrink: 0 }}>⏱</div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 14, fontWeight: 600, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {taskTitle}
+                      </div>
+                      <div style={{ fontSize: 12, color: C.sub, marginTop: 4, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                        {projectName && (
+                          <span style={{ background: C.bg, color: C.sub, borderRadius: 6, padding: '2px 7px', fontSize: 11, fontWeight: 500 }}>
+                            {projectName}
+                          </span>
+                        )}
+                        {e.description && (
+                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 320 }}>
+                            “{e.description}”
+                          </span>
+                        )}
+                        <span style={{ color: C.muted }}>·</span>
+                        <span>{new Date(e.startedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                      </div>
                     </div>
-                    <div style={{ fontSize: 12, color: C.sub, marginTop: 3 }}>
-                      {new Date(e.startedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                    <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                      <div style={{ fontSize: 14, fontWeight: 700, color: C.text }}>{e.duration}m</div>
+                      <div style={{ fontSize: 11, color: C.muted }}>{Math.floor(e.duration / 60)}h {e.duration % 60}m</div>
                     </div>
                   </div>
-                  <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                    <div style={{ fontSize: 14, fontWeight: 700, color: C.text }}>{e.duration}m</div>
-                    <div style={{ fontSize: 11, color: C.muted }}>{Math.floor(e.duration / 60)}h {e.duration % 60}m</div>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
