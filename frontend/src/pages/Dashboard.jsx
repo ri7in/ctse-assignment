@@ -59,14 +59,12 @@ export default function Dashboard() {
   const totalTasks = projects.reduce((s, p) => s + (p.totalTasks || 0), 0);
   const completedTasks = projects.reduce((s, p) => s + (p.completedTasks || 0), 0);
   const totalTime = dashboard?.dailyStats?.reduce((s, d) => s + d.totalMinutes, 0) ?? 0;
-  const hour = new Date().getHours();
-  const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
 
   return (
     <div style={{ maxWidth: 1200, margin: "0 auto", padding: "40px 24px", fontFamily: FONT }}>
       <div style={{ marginBottom: 36 }}>
         <h1 style={{ fontSize: 34, fontWeight: 700, color: C.text, letterSpacing: "-.03em", margin: 0 }}>
-          {greeting}, {user?.name?.split(" ")[0]} 👋
+          Welcome back, {user?.name?.split(" ")[0]} 👋
         </h1>
         <p style={{ fontSize: 16, color: C.sub, margin: "8px 0 0" }}>Here is what is happening with your projects today.</p>
       </div>
