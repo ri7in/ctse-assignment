@@ -72,29 +72,33 @@ function Column({ column, tasks }) {
   const status = STATUS_COLOR[column.id];
   return (
     <div style={{
-      flex: '0 0 280px',
-      // Tinted background per status — differentiates lanes at a glance.
-      background: status.bg,
-      borderRadius: 14,
-      padding: 12,
-      border: isOver ? `2px dashed ${C.accent}` : `2px dashed ${status.bg}`,
-      transition: 'border-color .15s',
+      flex: '0 0 296px',
+      // GitHub Projects style: flat white lane with a clear 1px border, no shadow.
+      background: '#fff',
+      borderRadius: 8,
+      padding: 0,
+      border: isOver ? `1px solid ${C.accent}` : `1px solid ${C.borderMd}`,
+      transition: 'border-color .15s, background .15s',
       display: 'flex',
       flexDirection: 'column',
       // Fixed lane height so layout doesn't jump as cards move between columns.
       height: 'calc(100vh - 220px)',
       minHeight: 480,
     }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 6px 12px' }}>
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: '12px 14px',
+        borderBottom: '1px solid ' + C.border,
+      }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{ width: 8, height: 8, borderRadius: '50%', background: status.text }} />
-          <span style={{ fontSize: 13, fontWeight: 700, color: C.text, letterSpacing: '-.01em' }}>{column.title}</span>
+          <span style={{ fontSize: 13, fontWeight: 600, color: C.text, letterSpacing: '-.01em' }}>{column.title}</span>
         </div>
-        <span style={{ fontSize: 11, fontWeight: 600, color: status.text, background: '#fff', borderRadius: 6, padding: '2px 7px' }}>
-          {tasks.length}
-        </span>
+        <span style={{ fontSize: 12, fontWeight: 500, color: C.sub, background: C.bg, borderRadius: 999, padding: '1px 9px', minWidth: 22, textAlign: 'center' }}>{tasks.length}</span>
       </div>
-      <div ref={setNodeRef} style={{ flex: 1, overflowY: 'auto', padding: '0 2px 6px', minHeight: 60 }}>
+      <div ref={setNodeRef} style={{ flex: 1, overflowY: 'auto', padding: '10px 10px 12px', minHeight: 60 }}>
         {tasks.map(t => <DraggableTask key={t._id} task={t} />)}
       </div>
     </div>
