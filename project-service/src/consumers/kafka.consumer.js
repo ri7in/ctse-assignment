@@ -14,9 +14,20 @@ const handlers = {
     await Project.findByIdAndUpdate(projectId, { $inc: { totalTasks: 1 } });
   },
 
-  // task.completed → increment completedTasks
+  // task.completed → increment completedTasks (fired by /complete endpoint)
   'task.completed': async ({ projectId }) => {
     await Project.findByIdAndUpdate(projectId, { $inc: { completedTasks: 1 } });
+  },
+
+  // task.status.changed → sync completedTasks when status moves to/from 'done'
+  'task.status.changed': async ({ projectId, oldStatus, newStatus }) => {
+    if (oldStatus === newStatus) return;
+    const inc = {};
+    if (newStatus === 'done') inc.completedTasks = 1;
+    else if (oldStatus === 'done') inc.completedTasks = -1;
+    if (Object.keys(inc).length) {
+      await Project.findByIdAndUpdate(projectId, { $inc: inc });
+    }
   },
 
   // task.deleted → decrement counters
