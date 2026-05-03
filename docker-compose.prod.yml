@@ -87,7 +87,7 @@ services:
       mongodb:
         condition: service_healthy
     healthcheck:
-      test: ['CMD-SHELL', 'curl -f http://localhost:3000/health || exit 1']
+      test: ['CMD-SHELL', 'wget -q --spider http://localhost:3000/health || exit 1']
       interval: 10s
       timeout: 5s
       retries: 5
@@ -107,7 +107,7 @@ services:
       KAFKA_CLIENT_ID: 'user-service'
     depends_on: *kafka-deps
     healthcheck:
-      test: ['CMD-SHELL', 'curl -f http://localhost:3001/health || exit 1']
+      test: ['CMD-SHELL', 'wget -q --spider http://localhost:3001/health || exit 1']
       interval: 10s
       timeout: 5s
       retries: 5
@@ -128,7 +128,7 @@ services:
       KAFKA_GROUP_ID: 'tasky-project-group'
     depends_on: *kafka-deps
     healthcheck:
-      test: ['CMD-SHELL', 'curl -f http://localhost:3002/health || exit 1']
+      test: ['CMD-SHELL', 'wget -q --spider http://localhost:3002/health || exit 1']
       interval: 10s
       timeout: 5s
       retries: 5
@@ -149,7 +149,7 @@ services:
       KAFKA_GROUP_ID: 'tasky-task-group'
     depends_on: *kafka-deps
     healthcheck:
-      test: ['CMD-SHELL', 'curl -f http://localhost:3003/health || exit 1']
+      test: ['CMD-SHELL', 'wget -q --spider http://localhost:3003/health || exit 1']
       interval: 10s
       timeout: 5s
       retries: 5
@@ -170,7 +170,7 @@ services:
       KAFKA_GROUP_ID: 'tasky-tracker-group'
     depends_on: *kafka-deps
     healthcheck:
-      test: ['CMD-SHELL', 'curl -f http://localhost:3004/health || exit 1']
+      test: ['CMD-SHELL', 'wget -q --spider http://localhost:3004/health || exit 1']
       interval: 10s
       timeout: 5s
       retries: 5
@@ -193,7 +193,7 @@ services:
       FIREBASE_SERVICE_ACCOUNT: ${FIREBASE_SERVICE_ACCOUNT}
     depends_on: *kafka-deps
     healthcheck:
-      test: ['CMD-SHELL', 'curl -f http://localhost:3005/health || exit 1']
+      test: ['CMD-SHELL', 'wget -q --spider http://localhost:3005/health || exit 1']
       interval: 10s
       timeout: 5s
       retries: 5
