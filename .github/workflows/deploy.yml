@@ -145,7 +145,15 @@ jobs:
             aws ecr get-login-password --region "$AWS_REGION" \
               | docker login --username AWS --password-stdin "$ECR_REGISTRY"
 
+            # Pull all new images first to speed up the 'up' command
             docker compose --env-file deploy.env -f docker-compose.prod.yml pull
+
+            # Bring up stateful services first and wait for them to be healthy
+            echo "Starting stateful services (mongodb, kafka)..."
+            docker compose --env-file deploy.env -f docker-compose.prod.yml up -d --remove-orphans --wait --wait-timeout 180 mongodb kafka
+
+            # Bring up the rest of the application
+            echo "Starting application services..."
             docker compose --env-file deploy.env -f docker-compose.prod.yml up -d --remove-orphans --wait --wait-timeout 300
 
             # Scoped cleanup — only dangling images, never touch volumes or unrelated containers.
