@@ -1,8 +1,15 @@
 import { useState, useEffect } from 'react';
-import { taskApi, projectApi } from '../services/api';
+import { taskApi, projectApi, trackerApi } from '../services/api';
 import { C, FONT, SHADOW, STATUS_COLOR, PRIORITY_COLOR, inputStyle, btnPrimary, btnSecondary } from '../ds';
 
 const STATUSES = ['backlog','todo','in-progress','in-review','done'];
+
+const fmtMin = (m) => {
+  if (!m) return '0m';
+  const h = Math.floor(m / 60);
+  const mm = m % 60;
+  return h > 0 ? `${h}h ${mm}m` : `${mm}m`;
+};
 
 function Badge({ text, map }) {
   const s = map[text] || { bg: C.bg, text: C.sub };
@@ -10,6 +17,114 @@ function Badge({ text, map }) {
     <span style={{ background: s.bg, color: s.text, borderRadius: 6, padding: '3px 8px', fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap' }}>
       {text}
     </span>
+  );
+}
+
+function TimePanel({ task, onClose, onChange }) {
+  const [entries, setEntries] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [form, setForm] = useState({ duration: 30, description: '' });
+
+  const load = () =>
+    trackerApi.getEntries({ taskId: task._id })
+      .then(({ data }) => setEntries(data))
+      .catch(() => setEntries([]))
+      .finally(() => setLoading(false));
+
+  useEffect(() => { load(); }, [task._id]);
+
+  const handleLog = async (e) => {
+    e.preventDefault();
+    const d = parseInt(form.duration, 10);
+    if (!d || d < 1) return;
+    setSubmitting(true);
+    const startedAt = new Date(Date.now() - d * 60_000).toISOString();
+    const endedAt = new Date().toISOString();
+    try {
+      await trackerApi.createEntry({
+        taskId: task._id,
+        projectId: task.projectId,
+        startedAt, endedAt, duration: d,
+        description: form.description,
+      });
+      setForm({ duration: 30, description: '' });
+      await load();
+      onChange?.();
+    } finally { setSubmitting(false); }
+  };
+
+  const handleDelete = async (id) => {
+    if (!confirm('Delete this time entry?')) return;
+    await trackerApi.deleteEntry(id);
+    await load();
+    onChange?.();
+  };
+
+  const total = entries.reduce((s, e) => s + (e.duration || 0), 0);
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 999, padding: 24 }}>
+      <div style={{ background: '#fff', borderRadius: 20, boxShadow: SHADOW.lg, width: '100%', maxWidth: 560, maxHeight: '85vh', display: 'flex', flexDirection: 'column', fontFamily: FONT }}>
+        <div style={{ padding: '24px 28px 18px', borderBottom: '1px solid ' + C.border }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: 12, color: C.sub, fontWeight: 600, marginBottom: 4 }}>TIME TRACKING</div>
+              <h2 style={{ fontSize: 18, fontWeight: 700, color: C.text, letterSpacing: '-.02em', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{task.title}</h2>
+              <div style={{ fontSize: 13, color: C.sub, marginTop: 6 }}>
+                Total: <strong style={{ color: C.text }}>{fmtMin(total)}</strong> &middot; {entries.length} {entries.length === 1 ? 'entry' : 'entries'}
+              </div>
+            </div>
+            <button onClick={onClose} style={{ background: 'transparent', border: 'none', fontSize: 22, color: C.muted, cursor: 'pointer', lineHeight: 1, padding: 4 }}>×</button>
+          </div>
+        </div>
+
+        <form onSubmit={handleLog} style={{ padding: '18px 28px', borderBottom: '1px solid ' + C.border, display: 'grid', gridTemplateColumns: '110px 1fr auto', gap: 10, alignItems: 'end' }}>
+          <div>
+            <label style={{ display: 'block', fontSize: 11, color: C.sub, fontWeight: 600, marginBottom: 6 }}>MINUTES</label>
+            <input type="number" min="1" value={form.duration} onChange={e => setForm({ ...form, duration: e.target.value })}
+              style={{ ...inputStyle, padding: '8px 10px', fontSize: 14 }} />
+          </div>
+          <div>
+            <label style={{ display: 'block', fontSize: 11, color: C.sub, fontWeight: 600, marginBottom: 6 }}>NOTE (OPTIONAL)</label>
+            <input type="text" placeholder="What did you work on?" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })}
+              style={{ ...inputStyle, padding: '8px 10px', fontSize: 14 }} />
+          </div>
+          <button type="submit" disabled={submitting} style={{ ...btnPrimary, padding: '9px 16px', borderRadius: 10, fontSize: 13, opacity: submitting ? .7 : 1 }}>
+            {submitting ? 'Logging…' : 'Log'}
+          </button>
+        </form>
+
+        <div style={{ flex: 1, overflowY: 'auto', padding: '8px 0' }}>
+          {loading ? (
+            <div style={{ padding: '32px 28px', color: C.muted, fontSize: 13, textAlign: 'center' }}>Loading…</div>
+          ) : entries.length === 0 ? (
+            <div style={{ padding: '40px 28px', textAlign: 'center' }}>
+              <div style={{ fontSize: 32, marginBottom: 10 }}>⏱</div>
+              <div style={{ fontSize: 14, fontWeight: 600, color: C.text, marginBottom: 4 }}>No time logged yet</div>
+              <div style={{ fontSize: 12, color: C.sub }}>Log work above, or move the task to “in-progress” to auto-track.</div>
+            </div>
+          ) : entries.map((e) => (
+            <div key={e._id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 28px' }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {e.description || 'Work session'}
+                </div>
+                <div style={{ fontSize: 11, color: C.sub, marginTop: 2 }}>
+                  {new Date(e.startedAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                </div>
+              </div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: C.text, whiteSpace: 'nowrap' }}>{fmtMin(e.duration)}</div>
+              <button onClick={() => handleDelete(e._id)} style={{ background: 'transparent', border: 'none', color: C.muted, cursor: 'pointer', fontSize: 14, padding: '4px 6px' }}>×</button>
+            </div>
+          ))}
+        </div>
+
+        <div style={{ padding: '14px 28px', borderTop: '1px solid ' + C.border, display: 'flex', justifyContent: 'flex-end' }}>
+          <button onClick={onClose} style={{ ...btnSecondary, padding: '9px 18px' }}>Done</button>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -86,6 +201,7 @@ export default function Tasks() {
   const [showModal, setShowModal] = useState(false);
   const [creating, setCreating] = useState(false);
   const [filter, setFilter] = useState('all');
+  const [timeTask, setTimeTask] = useState(null);
   const params = new URLSearchParams(window.location.search);
   const projectId = params.get('projectId');
 
@@ -111,6 +227,7 @@ export default function Tasks() {
   return (
     <div style={{ maxWidth: 1200, margin: '0 auto', padding: '40px 24px', fontFamily: FONT }}>
       {showModal && <TaskModal projectId={projectId} onClose={() => setShowModal(false)} onSubmit={handleCreate} loading={creating} />}
+      {timeTask && <TimePanel task={timeTask} onClose={() => setTimeTask(null)} onChange={load} />}
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 28 }}>
         <div>
@@ -162,6 +279,11 @@ export default function Tasks() {
                       {t.title}
                     </span>
                     <Badge text={t.priority} map={PRIORITY_COLOR} />
+                    {t.trackedTime > 0 && (
+                      <span style={{ background: C.accentLight, color: C.accent, borderRadius: 6, padding: '3px 8px', fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap' }}>
+                        ⏱ {fmtMin(t.trackedTime)}
+                      </span>
+                    )}
                   </div>
                   {t.dueDate && (
                     <div style={{ fontSize: 12, color: C.muted, marginTop: 4 }}>
@@ -169,6 +291,12 @@ export default function Tasks() {
                     </div>
                   )}
                 </div>
+
+                <button onClick={() => setTimeTask(t)}
+                  title="Time entries"
+                  style={{ background: 'transparent', border: '1px solid ' + C.border, borderRadius: 8, padding: '6px 10px', fontSize: 12, fontWeight: 600, color: C.sub, cursor: 'pointer', fontFamily: FONT, whiteSpace: 'nowrap' }}>
+                  ⏱ Time
+                </button>
 
                 <select
                   value={t.status}

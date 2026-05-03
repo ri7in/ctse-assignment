@@ -43,6 +43,11 @@ function TaskCard({ task, dragging = false }) {
             {new Date(task.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
           </span>
         )}
+        {task.trackedTime > 0 && (
+          <span style={{ background: C.accentLight, color: C.accent, borderRadius: 6, padding: '3px 7px', fontSize: 10, fontWeight: 600 }}>
+            ⏱ {task.trackedTime >= 60 ? `${Math.floor(task.trackedTime / 60)}h ${task.trackedTime % 60}m` : `${task.trackedTime}m`}
+          </span>
+        )}
       </div>
     </div>
   );
