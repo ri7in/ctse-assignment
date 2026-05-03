@@ -5,6 +5,7 @@ import { EventProvider } from './context/EventContext';
 import { useEvents } from './context/EventContext';
 import Dashboard from './pages/Dashboard';
 import Projects from './pages/Projects';
+import ProjectBoard from './pages/ProjectBoard';
 import Tasks from './pages/Tasks';
 import Tracker from './pages/Tracker';
 import Inbox from './pages/Inbox';
@@ -186,8 +187,9 @@ function AppRoutes() {
         <Route path="/login"    element={user ? <Navigate to="/" replace /> : <Login />} />
         <Route path="/register" element={user ? <Navigate to="/" replace /> : <Register />} />
         <Route path="/"         element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-        <Route path="/projects" element={<ProtectedRoute><Projects /></ProtectedRoute>} />
-        <Route path="/tasks"    element={<ProtectedRoute><Tasks /></ProtectedRoute>} />
+        <Route path="/projects"     element={<ProtectedRoute><Projects /></ProtectedRoute>} />
+        <Route path="/projects/:id" element={<ProtectedRoute><ProjectBoard /></ProtectedRoute>} />
+        <Route path="/tasks"        element={<ProtectedRoute><Tasks /></ProtectedRoute>} />
         <Route path="/tracker"  element={<ProtectedRoute><Tracker /></ProtectedRoute>} />
         <Route path="/inbox"    element={<ProtectedRoute><Inbox /></ProtectedRoute>} />
         <Route path="*"         element={<Navigate to="/" replace />} />

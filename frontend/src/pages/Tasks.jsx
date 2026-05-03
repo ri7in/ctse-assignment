@@ -97,7 +97,13 @@ export default function Tasks() {
     try { await taskApi.create(form); setShowModal(false); load(); } finally { setCreating(false); }
   };
 
-  const handleComplete = async (id) => { await taskApi.complete(id); load(); };
+  const handleStatus = async (id, status) => {
+    // Optimistic update so the dropdown feels instant.
+    const prev = tasks;
+    setTasks(prev.map(t => t._id === id ? { ...t, status } : t));
+    try { await taskApi.update(id, { status }); }
+    catch { setTasks(prev); }
+  };
   const handleDelete = async (id) => { if (!confirm('Delete task?')) return; await taskApi.delete(id); load(); };
 
   const filtered = filter === 'all' ? tasks : tasks.filter(t => t.status === filter);
@@ -146,35 +152,54 @@ export default function Tasks() {
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {filtered.map((t) => (
-            <div key={t._id} style={{ background: '#fff', borderRadius: 14, border: '1px solid ' + C.border, boxShadow: SHADOW.xs, padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 16 }}>
-              {/* Complete button */}
-              <button onClick={() => handleComplete(t._id)} disabled={t.status === 'done'}
-                style={{ width: 22, height: 22, borderRadius: '50%', border: '2px solid ' + (t.status === 'done' ? C.success : C.borderMd), background: t.status === 'done' ? C.success : 'transparent', cursor: t.status === 'done' ? 'default' : 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all .15s' }}>
-                {t.status === 'done' && <svg width="10" height="8" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>}
-              </button>
-
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                  <span style={{ fontSize: 15, fontWeight: 600, color: t.status === 'done' ? C.muted : C.text, textDecoration: t.status === 'done' ? 'line-through' : 'none', letterSpacing: '-.01em' }}>
-                    {t.title}
-                  </span>
-                  <Badge text={t.status} map={STATUS_COLOR} />
-                  <Badge text={t.priority} map={PRIORITY_COLOR} />
-                </div>
-                {t.dueDate && (
-                  <div style={{ fontSize: 12, color: C.muted, marginTop: 4 }}>
-                    Due {new Date(t.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+          {filtered.map((t) => {
+            const sCol = STATUS_COLOR[t.status] || { bg: C.bg, text: C.sub };
+            return (
+              <div key={t._id} style={{ background: '#fff', borderRadius: 14, border: '1px solid ' + C.border, boxShadow: SHADOW.xs, padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 16 }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: 15, fontWeight: 600, color: t.status === 'done' ? C.muted : C.text, textDecoration: t.status === 'done' ? 'line-through' : 'none', letterSpacing: '-.01em' }}>
+                      {t.title}
+                    </span>
+                    <Badge text={t.priority} map={PRIORITY_COLOR} />
                   </div>
-                )}
-              </div>
+                  {t.dueDate && (
+                    <div style={{ fontSize: 12, color: C.muted, marginTop: 4 }}>
+                      Due {new Date(t.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                    </div>
+                  )}
+                </div>
 
-              <button onClick={() => handleDelete(t._id)}
-                style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: C.muted, fontSize: 16, padding: '4px 6px', borderRadius: 6, lineHeight: 1 }}>
-                ×
-              </button>
-            </div>
-          ))}
+                <select
+                  value={t.status}
+                  onChange={(e) => handleStatus(t._id, e.target.value)}
+                  style={{
+                    background: sCol.bg,
+                    color: sCol.text,
+                    border: '1px solid ' + C.border,
+                    borderRadius: 8,
+                    padding: '6px 10px',
+                    fontSize: 12,
+                    fontWeight: 600,
+                    fontFamily: FONT,
+                    cursor: 'pointer',
+                    appearance: 'none',
+                    paddingRight: 26,
+                    backgroundImage: 'url("data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'10\' height=\'10\' viewBox=\'0 0 10 10\'><path d=\'M2 4l3 3 3-3\' stroke=\'%236E6E73\' stroke-width=\'1.5\' fill=\'none\' stroke-linecap=\'round\'/></svg>")',
+                    backgroundRepeat: 'no-repeat',
+                    backgroundPosition: 'right 8px center',
+                  }}
+                >
+                  {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+
+                <button onClick={() => handleDelete(t._id)}
+                  style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: C.muted, fontSize: 16, padding: '4px 6px', borderRadius: 6, lineHeight: 1 }}>
+                  ×
+                </button>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
