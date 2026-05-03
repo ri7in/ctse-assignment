@@ -7,6 +7,7 @@ const connectDB = require('./config/db');
 const { initFirebase } = require('./config/firebase');
 const inboxRoutes = require('./routes/inbox.routes');
 const { startConsumer } = require('./consumers/kafka.consumer');
+const { backfillProjectIndex } = require('./services/project.client');
 const setupSwagger = require('../swagger/swagger');
 
 const app = express();
@@ -40,6 +41,10 @@ if (require.main === module) {
   connectDB().then(async () => {
     initFirebase();
     await startConsumer();
+    // Best-effort: seed ProjectIndex from project-service so handlers for
+    // pre-existing projects can fan out notifications. Lazy fetch in the
+    // task.created handler covers anything missed.
+    backfillProjectIndex().catch(() => {});
     app.listen(PORT, () => console.log(`inbox-service running on port ${PORT}`));
   });
 }

@@ -2,6 +2,7 @@ const { Kafka } = require('kafkajs');
 const { createNotification } = require('../services/notification.service');
 const Notification = require('../models/Notification');
 const ProjectIndex = require('../models/ProjectIndex');
+const { ensureProjectIndex } = require('../services/project.client');
 const { deleteUserNotifications } = require('../config/firebase');
 
 const kafka = new Kafka({
@@ -101,7 +102,9 @@ const handlers = {
 
   // task.created → notify every project member except the creator
   'task.created': async ({ taskId, title, projectId, reporterId, assigneeId, priority }) => {
-    const idx = await ProjectIndex.findOne({ projectId });
+    // Falls back to fetching project-service if we haven't indexed this project yet
+    // (e.g. it was created before this consumer started, or the project event was missed).
+    const idx = await ensureProjectIndex(projectId);
     if (!idx) return;
     // Skip the creator (they triggered it) and the assignee (covered by task.assigned).
     const recipients = idx.members.filter((u) => u !== reporterId && u !== assigneeId);

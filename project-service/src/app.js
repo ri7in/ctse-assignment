@@ -5,6 +5,7 @@ const cors = require('cors');
 const rateLimit = require('express-rate-limit');
 const connectDB = require('./config/db');
 const projectRoutes = require('./routes/project.routes');
+const internalRoutes = require('./routes/internal.routes');
 const { startConsumer } = require('./consumers/kafka.consumer');
 const setupSwagger = require('../swagger/swagger');
 
@@ -26,6 +27,7 @@ setupSwagger(app);
 
 app.get('/health', (_req, res) => res.json({ status: 'ok', service: 'project-service' }));
 app.use('/api/projects', projectRoutes);
+app.use('/internal', internalRoutes);
 
 app.use((_req, res) => res.status(404).json({ error: 'Not found' }));
 app.use((err, _req, res, _next) => {

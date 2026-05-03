@@ -193,6 +193,7 @@ services:
       PORT: '3005'
       MONGODB_URI: 'mongodb://mongodb:27017/tasktracker-inbox'
       AUTH_SERVICE_URL: 'http://auth-service:3000'
+      PROJECT_SERVICE_URL: 'http://project-service:3002'
       KAFKA_BROKER: 'kafka:9092'
       KAFKA_CLIENT_ID: 'inbox-service'
       KAFKA_GROUP_ID: 'tasky-inbox-group'
