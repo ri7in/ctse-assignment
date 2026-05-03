@@ -7,7 +7,8 @@ const TimeEntrySchema = new mongoose.Schema({
   description: { type: String, default: '' },
   startedAt: { type: Date, required: true },
   endedAt: { type: Date, default: null },
-  duration: { type: Number, default: 0 }  // minutes
+  duration: { type: Number, default: 0 },  // minutes
+  completed: { type: Boolean, default: false }
 }, { timestamps: true });
 
 module.exports = mongoose.model('TimeEntry', TimeEntrySchema);
