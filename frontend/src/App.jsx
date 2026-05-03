@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { EventProvider } from './context/EventContext';
 import { useEvents } from './context/EventContext';
+import { ToastProvider } from './context/ToastContext';
 import Dashboard from './pages/Dashboard';
 import Projects from './pages/Projects';
 import ProjectBoard from './pages/ProjectBoard';
@@ -202,9 +203,11 @@ export default function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <EventProvider>
-          <AppRoutes />
-        </EventProvider>
+        <ToastProvider>
+          <EventProvider>
+            <AppRoutes />
+          </EventProvider>
+        </ToastProvider>
       </AuthProvider>
     </BrowserRouter>
   );

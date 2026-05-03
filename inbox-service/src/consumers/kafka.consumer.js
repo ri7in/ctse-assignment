@@ -1,6 +1,7 @@
 const { Kafka } = require('kafkajs');
 const { createNotification } = require('../services/notification.service');
 const Notification = require('../models/Notification');
+const ProjectIndex = require('../models/ProjectIndex');
 const { deleteUserNotifications } = require('../config/firebase');
 
 const kafka = new Kafka({
@@ -54,8 +55,12 @@ const handlers = {
     // This is handled when task.assigned is emitted alongside
   },
 
-  // member.added → notify new member
+  // member.added → notify new member, keep ProjectIndex in sync
   'member.added': async ({ userId, projectId, projectName, addedBy }) => {
+    await ProjectIndex.updateOne(
+      { projectId },
+      { $addToSet: { members: userId } }
+    );
     await createNotification({
       userId,
       event: 'member.added',
@@ -65,8 +70,21 @@ const handlers = {
     });
   },
 
-  // project.created → notify owner
-  'project.created': async ({ ownerId, projectId, name }) => {
+  // member.removed → keep ProjectIndex in sync
+  'member.removed': async ({ projectId, userId }) => {
+    await ProjectIndex.updateOne(
+      { projectId },
+      { $pull: { members: userId } }
+    );
+  },
+
+  // project.created → seed ProjectIndex + notify owner
+  'project.created': async ({ ownerId, projectId, name, members = [] }) => {
+    await ProjectIndex.updateOne(
+      { projectId },
+      { $set: { projectId, ownerId, members: [...new Set([ownerId, ...members])] } },
+      { upsert: true }
+    );
     await createNotification({
       userId: ownerId,
       event: 'project.created',
@@ -74,6 +92,28 @@ const handlers = {
       body: name,
       metadata: { projectId }
     });
+  },
+
+  // project.deleted → drop ProjectIndex entry
+  'project.deleted': async ({ projectId }) => {
+    await ProjectIndex.deleteOne({ projectId });
+  },
+
+  // task.created → notify every project member except the creator
+  'task.created': async ({ taskId, title, projectId, reporterId, assigneeId, priority }) => {
+    const idx = await ProjectIndex.findOne({ projectId });
+    if (!idx) return;
+    // Skip the creator (they triggered it) and the assignee (covered by task.assigned).
+    const recipients = idx.members.filter((u) => u !== reporterId && u !== assigneeId);
+    for (const userId of recipients) {
+      await createNotification({
+        userId,
+        event: 'task.created',
+        title: `New task: ${title}`,
+        body: priority ? `Priority: ${priority}` : title,
+        metadata: { taskId, projectId, actorId: reporterId }
+      });
+    }
   },
 
   // milestone.reached → notify all project members
