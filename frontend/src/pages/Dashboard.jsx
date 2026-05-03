@@ -60,7 +60,7 @@ export default function Dashboard() {
   const completedTasks = projects.reduce((s, p) => s + (p.completedTasks || 0), 0);
   const totalTime = dashboard?.dailyStats?.reduce((s, d) => s + d.totalMinutes, 0) ?? 0;
   const hour = new Date().getHours();
-  const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good night" : "Good evening";
+  const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
 
   return (
     <div style={{ maxWidth: 1200, margin: "0 auto", padding: "40px 24px", fontFamily: FONT }}>
