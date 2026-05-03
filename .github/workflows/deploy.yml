@@ -130,33 +130,35 @@ jobs:
           username: ec2-user
           key: ${{ secrets.EC2_SSH_KEY }}
           timeout: 600s
-          # ECR_REGISTRY is needed before the inline aws ecr login command.
           envs: AWS_REGION
           script: |
             set -euo pipefail
             cd /home/ec2-user/tasky
 
-            # Lock down the env file (contains secrets)
+            # Cleanup before deploy
+            echo "Cleaning up old containers and images..."
+            docker stop $(docker ps -aq) 2>/dev/null || true
+            docker rm $(docker ps -aq) 2>/dev/null || true
+            docker system prune -a -f --volumes 2>/dev/null || true
+
+            echo "Disk space after cleanup:"
+            df -h /
+
             chmod 600 deploy.env
 
-            # Source registry from rendered env file for the login step
             ECR_REGISTRY=$(grep -E '^ECR_REGISTRY=' deploy.env | cut -d= -f2-)
 
             aws ecr get-login-password --region "$AWS_REGION" \
               | docker login --username AWS --password-stdin "$ECR_REGISTRY"
 
-            # Pull all new images first to speed up the 'up' command
             docker compose --env-file deploy.env -f docker-compose.prod.yml pull
 
-            # Bring up stateful services first and wait for them to be healthy
-            echo "Starting stateful services (mongodb, kafka)..."
+            echo "Starting stateful services..."
             docker compose --env-file deploy.env -f docker-compose.prod.yml up -d --remove-orphans --wait --wait-timeout 180 mongodb kafka
 
-            # Bring up the rest of the application
             echo "Starting application services..."
             docker compose --env-file deploy.env -f docker-compose.prod.yml up -d --remove-orphans --wait --wait-timeout 300
 
-            # Scoped cleanup — only dangling images, never touch volumes or unrelated containers.
             docker image prune -f --filter "until=24h"
 
             docker compose --env-file deploy.env -f docker-compose.prod.yml ps
