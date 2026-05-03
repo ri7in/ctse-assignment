@@ -100,19 +100,25 @@ const handlers = {
     await ProjectIndex.deleteOne({ projectId });
   },
 
-  // task.created → notify every project member except the creator
+  // task.created → notify the creator (mirrors project.created notifying the
+  // owner) AND every other project member. The assignee is excluded because
+  // they're already covered by task.assigned, which fires alongside.
   'task.created': async ({ taskId, title, projectId, reporterId, assigneeId, priority }) => {
     // Falls back to fetching project-service if we haven't indexed this project yet
     // (e.g. it was created before this consumer started, or the project event was missed).
     const idx = await ensureProjectIndex(projectId);
-    if (!idx) return;
-    // Skip the creator (they triggered it) and the assignee (covered by task.assigned).
-    const recipients = idx.members.filter((u) => u !== reporterId && u !== assigneeId);
-    for (const userId of recipients) {
+    const memberPool = idx ? idx.members : [];
+    // Always include the creator even if for some reason they're not in the
+    // member list (handles edge cases where the project lookup failed).
+    const recipientSet = new Set([reporterId, ...memberPool]);
+    if (assigneeId) recipientSet.delete(assigneeId);
+
+    for (const userId of recipientSet) {
+      const isCreator = userId === reporterId;
       await createNotification({
         userId,
         event: 'task.created',
-        title: `New task: ${title}`,
+        title: isCreator ? `Task created: ${title}` : `New task: ${title}`,
         body: priority ? `Priority: ${priority}` : title,
         metadata: { taskId, projectId, actorId: reporterId }
       });
