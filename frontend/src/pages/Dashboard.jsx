@@ -23,7 +23,7 @@ function StatCard({ label, value, sub, color, icon }) {
 function WeekChart({ dailyStats }) {
   if (!dailyStats?.length) return null;
   const max = Math.max(...dailyStats.map(d => d.totalMinutes), 60);
-  const days = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+  const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
   return (
     <div style={{ display: "flex", alignItems: "flex-end", gap: 8, height: 80 }}>
       {dailyStats.map((day) => {
@@ -52,15 +52,15 @@ export default function Dashboard() {
   const [projects, setProjects] = useState([]);
 
   useEffect(() => {
-    trackerApi.getDashboard().then(({ data }) => setDashboard(data)).catch(() => {});
-    projectApi.list().then(({ data }) => setProjects(data)).catch(() => {});
+    trackerApi.getDashboard().then(({ data }) => setDashboard(data)).catch(() => { });
+    projectApi.list().then(({ data }) => setProjects(data)).catch(() => { });
   }, []);
 
   const totalTasks = projects.reduce((s, p) => s + (p.totalTasks || 0), 0);
   const completedTasks = projects.reduce((s, p) => s + (p.completedTasks || 0), 0);
   const totalTime = dashboard?.dailyStats?.reduce((s, d) => s + d.totalMinutes, 0) ?? 0;
   const hour = new Date().getHours();
-  const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
+  const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good night" : "Good evening";
 
   return (
     <div style={{ maxWidth: 1200, margin: "0 auto", padding: "40px 24px", fontFamily: FONT }}>
@@ -82,10 +82,10 @@ export default function Dashboard() {
       )}
 
       <div style={{ display: "flex", gap: 16, marginBottom: 32, flexWrap: "wrap" }}>
-        <StatCard label="Projects"       value={projects.length}  sub="Active workspaces" color={C.info}    icon="📁" />
-        <StatCard label="Total Tasks"    value={totalTasks}        sub="Across all projects" color={C.accent} icon="✅" />
-        <StatCard label="Completed"      value={completedTasks}    sub={(totalTasks > 0 ? Math.round(completedTasks/totalTasks*100) : 0) + "% rate"} color={C.success} icon="🎯" />
-        <StatCard label="Time This Week" value={Math.floor(totalTime/60) + "h " + (totalTime%60) + "m"} sub="Logged hours" color={C.warning} icon="⏱" />
+        <StatCard label="Projects" value={projects.length} sub="Active workspaces" color={C.info} icon="📁" />
+        <StatCard label="Total Tasks" value={totalTasks} sub="Across all projects" color={C.accent} icon="✅" />
+        <StatCard label="Completed" value={completedTasks} sub={(totalTasks > 0 ? Math.round(completedTasks / totalTasks * 100) : 0) + "% rate"} color={C.success} icon="🎯" />
+        <StatCard label="Time This Week" value={Math.floor(totalTime / 60) + "h " + (totalTime % 60) + "m"} sub="Logged hours" color={C.warning} icon="⏱" />
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 320px", gap: 24, alignItems: "start" }}>
@@ -135,7 +135,7 @@ export default function Dashboard() {
           {dashboard?.dailyStats ? <WeekChart dailyStats={dashboard.dailyStats} /> : <div style={{ height: 80, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, color: C.muted }}>Loading…</div>}
           {totalTime > 0 && (
             <div style={{ marginTop: 20, paddingTop: 16, borderTop: "1px solid " + C.border }}>
-              <div style={{ fontSize: 22, fontWeight: 700, color: C.text }}>{Math.floor(totalTime/60)}h {totalTime%60}m</div>
+              <div style={{ fontSize: 22, fontWeight: 700, color: C.text }}>{Math.floor(totalTime / 60)}h {totalTime % 60}m</div>
               <div style={{ fontSize: 12, color: C.sub, marginTop: 2 }}>total this week</div>
             </div>
           )}
