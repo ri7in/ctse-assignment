@@ -70,11 +70,11 @@ services:
     volumes:
       - kafka_data:/var/lib/kafka/data
     healthcheck:
-      test: ['CMD', '/opt/kafka/bin/kafka-topics.sh', '--list', '--bootstrap-server', 'localhost:9092']
+      test: ['CMD-SHELL', 'nc -z localhost 9092 || exit 1']
       interval: 15s
       timeout: 10s
       retries: 10
-      start_period: 90s
+      start_period: 60s
     networks: [tasky-net]
     logging:
       driver: json-file
