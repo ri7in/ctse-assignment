@@ -123,9 +123,13 @@ export default function Projects() {
                   </div>
 
                   <div style={{ display: 'flex', gap: 8, paddingTop: 4 }}>
+                    <Link to={'/projects/' + p._id}
+                      style={{ flex: 1, textAlign: 'center', background: C.text, color: '#fff', borderRadius: 10, padding: '9px', fontSize: 13, fontWeight: 600, textDecoration: 'none' }}>
+                      Open board
+                    </Link>
                     <Link to={'/tasks?projectId=' + p._id}
-                      style={{ flex: 1, textAlign: 'center', background: C.bg, border: '1px solid ' + C.border, borderRadius: 10, padding: '9px', fontSize: 13, fontWeight: 600, color: C.text, textDecoration: 'none' }}>
-                      View tasks
+                      style={{ background: C.bg, border: '1px solid ' + C.border, borderRadius: 10, padding: '9px 14px', fontSize: 13, fontWeight: 500, color: C.text, textDecoration: 'none' }}>
+                      List
                     </Link>
                     <button onClick={() => handleDelete(p._id)} disabled={deleting === p._id}
                       style={{ background: C.dangerBg, border: '1px solid #FFBBBB', borderRadius: 10, padding: '9px 14px', fontSize: 13, color: C.danger, cursor: 'pointer', fontWeight: 500 }}>
