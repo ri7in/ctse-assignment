@@ -103,13 +103,7 @@ const getDashboard = async (req, res) => {
     }
   }
 
-  const completedTaskIds = await TimeEntry.distinct('taskId', {
-    userId: req.user.id,
-    completed: true,
-    updatedAt: { $gte: sevenDaysAgo }
-  });
-
-  res.json({ dailyStats: Object.values(dailyMap), tasksCompleted: completedTaskIds.length });
+  res.json({ dailyStats: Object.values(dailyMap) });
 };
 
 // GET /api/tracker/reports/project/:id

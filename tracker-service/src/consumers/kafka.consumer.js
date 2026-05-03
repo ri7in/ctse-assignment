@@ -10,48 +10,36 @@ const kafka = new Kafka({
 const consumer = kafka.consumer({ groupId: process.env.KAFKA_GROUP_ID || 'tasky-tracker-group' });
 
 const handlers = {
-  // task.status.changed → auto-start/stop time entry + track completion
-  'task.status.changed': async ({ taskId, projectId, assigneeId, oldStatus, newStatus }) => {
+  // task.status.changed → auto-start/stop time entry
+  'task.status.changed': async ({ taskId, projectId, assigneeId, newStatus }) => {
     if (!assigneeId) return;
 
     if (newStatus === 'in-progress') {
-      await TimeEntry.create({ taskId, projectId, userId: assigneeId, startedAt: new Date() });
-      return;
-    }
-
-    // Close any open entry for this task
-    const openEntry = await TimeEntry.findOne({ taskId, endedAt: null });
-    if (openEntry) {
-      const endedAt = new Date();
-      const duration = Math.round((endedAt - openEntry.startedAt) / 60000);
-      openEntry.endedAt = endedAt;
-      openEntry.duration = duration;
-      if (newStatus === 'done') openEntry.completed = true;
-      await openEntry.save();
-
-      await publish('timeEntry.logged', {
-        entryId: openEntry._id.toString(),
-        taskId, projectId, userId: assigneeId, duration
+      // Create open time entry
+      await TimeEntry.create({
+        taskId,
+        projectId,
+        userId: assigneeId,
+        startedAt: new Date()
       });
-    } else if (newStatus === 'done') {
-      // No open entry — mark the most recent one or create a completion record
-      const marked = await TimeEntry.findOneAndUpdate(
-        { taskId, userId: assigneeId },
-        { $set: { completed: true } },
-        { sort: { startedAt: -1 } }
-      );
-      if (!marked) {
-        const now = new Date();
-        await TimeEntry.create({
-          taskId, projectId, userId: assigneeId,
-          startedAt: now, endedAt: now, duration: 0, completed: true
+    } else {
+      // Close any open entry for this task
+      const entry = await TimeEntry.findOne({ taskId, endedAt: null });
+      if (entry) {
+        const endedAt = new Date();
+        const duration = Math.round((endedAt - entry.startedAt) / 60000);
+        entry.endedAt = endedAt;
+        entry.duration = duration;
+        await entry.save();
+
+        await publish('timeEntry.logged', {
+          entryId: entry._id.toString(),
+          taskId,
+          projectId,
+          userId: assigneeId,
+          duration
         });
       }
-    }
-
-    // Task moved back out of 'done' — unmark completion
-    if (oldStatus === 'done' && newStatus !== 'done') {
-      await TimeEntry.updateMany({ taskId, userId: assigneeId }, { completed: false });
     }
   },
 
