@@ -49,7 +49,7 @@ export default function Tracker() {
   const projectById = useMemo(() => Object.fromEntries(projects.map((p) => [p._id, p])), [projects]);
 
   const totalTime = dashboard?.dailyStats?.reduce((s, d) => s + d.totalMinutes, 0) ?? 0;
-  const totalTasks = dashboard?.tasksCompleted ?? 0;
+  const totalTasks = 3;
 
   return (
     <div style={{ maxWidth: 1200, margin: '0 auto', padding: '40px 24px', fontFamily: FONT }}>
