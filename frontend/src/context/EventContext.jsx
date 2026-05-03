@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useEffect, useCallback } from 'rea
 import { ref, onValue, off } from 'firebase/database';
 import { database } from '../services/firebase';
 import { useAuth } from './AuthContext';
+import { inboxApi } from '../services/api';
 
 const EventContext = createContext(null);
 
@@ -17,26 +18,36 @@ export const EventProvider = ({ children }) => {
       return;
     }
 
-    if (!database) return;
+    let cancelled = false;
+
+    inboxApi.getNotifications({ limit: 50 })
+      .then(({ data }) => {
+        if (cancelled) return;
+        const list = (data.notifications || []).map((n) => ({ ...n, id: n._id || n.id }));
+        setNotifications(list);
+        setUnreadCount(list.filter((n) => !n.read).length);
+      })
+      .catch(() => {});
+
+    if (!database) {
+      return () => { cancelled = true; };
+    }
 
     const notifRef = ref(database, `/notifications/${user.id}`);
-
     const unsubscribe = onValue(notifRef, (snapshot) => {
       const data = snapshot.val();
-      if (!data) {
-        setNotifications([]);
-        setUnreadCount(0);
-        return;
-      }
+      if (!data) return;
       const list = Object.entries(data)
         .map(([id, val]) => ({ id, ...val }))
         .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-
       setNotifications(list);
       setUnreadCount(list.filter((n) => !n.read).length);
     });
 
-    return () => off(notifRef);
+    return () => {
+      cancelled = true;
+      off(notifRef);
+    };
   }, [user?.id]);
 
   const dispatch = useCallback((action) => {
