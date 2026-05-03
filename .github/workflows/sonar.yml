@@ -1,0 +1,77 @@
+name: Code Quality (Sonar)
+
+# Runs on every push and on PRs into main/release-1 so quality gates fire
+# early — independently of the deploy pipeline (which only runs on release-1).
+on:
+  push:
+    branches:
+      - main
+      - release-1
+      - 'feat/**'
+      - 'fix/**'
+  pull_request:
+    branches: [main, release-1]
+  workflow_dispatch:
+
+# Don't pile up parallel scans for the same ref — Sonar is rate-limited.
+concurrency:
+  group: sonar-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  sonar:
+    name: Test + SonarCloud scan
+    runs-on: ubuntu-latest
+
+    # Backend tests speak to a real Mongo (Kafka/Firebase/auth are jest-mocked).
+    services:
+      mongodb:
+        image: mongo:7
+        ports: ['27017:27017']
+        options: >-
+          --health-cmd "mongosh --quiet --eval 'db.adminCommand({ping:1}).ok'"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      # Auth service tests exercise the real protect middleware, so we need
+      # a JWT secret. All other secrets are inert (Kafka/Firebase mocked).
+      JWT_SECRET: ci-test-secret-min-32-chars-here-ok
+      NODE_ENV: test
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # Sonar wants full history for accurate blame + new-code detection.
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install + test backend services with coverage
+        run: |
+          set -e
+          for svc in auth-service user-service project-service task-service tracker-service inbox-service; do
+            echo "::group::$svc"
+            (
+              cd "$svc"
+              # Backends don't ship lockfiles in this repo — fall back to install.
+              if [ -f package-lock.json ]; then npm ci --no-audit --no-fund; \
+              else npm install --no-audit --no-fund; fi
+              # Each service writes ./coverage/lcov.info, picked up by sonar-project.properties.
+              MONGODB_URI="mongodb://localhost:27017/${svc}-test" \
+                npm test -- --coverage --coverageReporters=lcov --forceExit
+            )
+            echo "::endgroup::"
+          done
+
+      - name: SonarCloud scan
+        # Reads sonar-project.properties at repo root.
+        uses: SonarSource/sonarqube-scan-action@v4
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
